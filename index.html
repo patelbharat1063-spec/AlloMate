@@ -324,7 +324,33 @@ function backupObject(){return {app:'AlloMate Local Breeding Management',version
 function backup(){download('AlloMate-backup-'+today()+'.json',JSON.stringify(backupObject()),'application/json');toast('Backup download started')}
 $('exportJSON').onclick=backup;$('quickBackup').onclick=backup;
 $('importJSONBtn').onclick=()=>$('importJSONFile').click();
-$('importJSONFile').addEventListener('change',async()=>{const f=$('importJSONFile').files[0];if(!f)return;try{const obj=JSON.parse(await f.text()),incoming=obj.state||obj;if(!confirm('Import backup and replace current app records? Export current data first if needed.'))return;for(const k of Object.keys(state))state[k]=Array.isArray(incoming[k])?incoming[k]:[];await persist();toast('Backup imported')}catch(e){toast('Invalid backup JSON')}finally{$('importJSONFile').value=''}});
+$('importJSONFile').addEventListener('change',async()=>{
+ const file=$('importJSONFile').files[0];if(!file)return;
+ try{
+  if(file.size>100*1024*1024)throw Error('Backup exceeds the 100 MB safety limit.');
+  const obj=JSON.parse(await file.text()),incoming=obj?.state||obj;
+  if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))throw Error('Backup must contain a state object.');
+  if(obj?.app&&obj.app!=='AlloMate Local Breeding Management')throw Error('This backup belongs to a different application.');
+  const known=Object.keys(state).filter(k=>Array.isArray(state[k])&&Array.isArray(incoming[k]));
+  if(!known.length)throw Error('No compatible AlloMate record collections were found.');
+  const preview=known.reduce((n,k)=>n+incoming[k].length,0);
+  if(!confirm('SAFE MERGE IMPORT\n\n'+preview+' incoming records across '+known.length+' collections. Existing records will NOT be replaced. New IDs will be added; identical records skipped; conflicting IDs skipped for manual review. A safety backup of current local data will download first. Continue?'))return;
+  backup();
+  let added=0,identical=0,conflicts=0,invalid=0;
+  for(const k of known){
+   const current=state[k],byId=new Map(current.filter(x=>x&&x.id!=null).map(x=>[String(x.id),x]));
+   for(const item of incoming[k]){
+    if(!item||typeof item!=='object'||Array.isArray(item)||item.id==null){invalid++;continue;}
+    const id=String(item.id),existing=byId.get(id);
+    if(!existing){current.push(item);byId.set(id,item);added++;continue;}
+    if(stableRecordJSON(existing)===stableRecordJSON(item))identical++;else conflicts++;
+   }
+  }
+  await persist();
+  toast('Safe import complete: '+added+' added, '+identical+' identical, '+conflicts+' conflicts skipped, '+invalid+' invalid skipped. Existing records were preserved.');
+ }catch(e){toast('Import stopped: '+(e.message||'Invalid backup JSON'))}
+ finally{$('importJSONFile').value=''}
+});
 function csv(arr){if(!arr.length)return '';const keys=[...new Set(arr.flatMap(o=>Object.keys(o)))];const cell=v=>{if(v&&typeof v==='object')v=JSON.stringify(v);return '"'+String(v??'').replace(/"/g,'""')+'"'};return [keys.map(cell).join(','),...arr.map(o=>keys.map(k=>cell(o[k])).join(','))].join('\r\n')}
 $('exportAnimals').onclick=()=>download('animals.csv',csv(state.animals),'text/csv');
 $('exportET').onclick=()=>download('et-records.csv',csv(state.et.map(({id,donor,sire,embryo,recipient,date,stage,pd,follow,notes})=>({id,donor,sire,embryo,recipient,date,stage,pd,follow,notes}))), 'text/csv');
