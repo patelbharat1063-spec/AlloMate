@@ -394,7 +394,7 @@ async function cloudPush(){
  // INSERT, never UPSERT: if another device creates the same key after the read,
  // the unique constraint rejects it rather than overwriting that cloud record.
  const batchSize=10;let inserted=0;
- for(let i=0;i<inserts.length;i+=batchSize){const batch=inserts.slice(i,i+batchSize);const {data,error}=await sbClient.from('allomate_records').insert(batch).select('record_id');if(error){if(error.code==='23505'){conflicts+=batch.length;continue;}throw error;}inserted+=(data||[]).length;}
+ for(let i=0;i<inserts.length;i+=batchSize){const batch=inserts.slice(i,i+batchSize);const {error}=await sbClient.from('allomate_records').insert(batch);if(!error){inserted+=batch.length;continue;}if(error.code!=='23505')throw error;for(const row of batch){const one=await sbClient.from('allomate_records').insert(row);if(one.error?.code==='23505'){conflicts++;continue;}if(one.error)throw one.error;inserted++;}}
  return {inserted,unchanged,conflicts,total:localRows.length};
 }
 $('sbSync').addEventListener('click',async()=>{try{cloudStatus('Syncing local records to Supabase…');const pushed=await cloudPush();cloudStatus('Downloading cloud records and merging missing IDs…');const pulled=await cloudPull(true);cloudStatus('Sync complete. '+pushed.inserted+' new records uploaded; '+pushed.unchanged+' already matched; '+pushed.conflicts+' conflicting records safely skipped. Downloaded '+pulled.count+' cloud rows and added '+pulled.added+' new local records. Resolve conflicts manually; neither copy was overwritten.',pushed.conflicts===0);toast('Cloud sync complete')}catch(e){cloudStatus('Sync failed: '+(e.message||String(e))+' — check SQL setup, sign-in, network, and RLS policies.')}});
