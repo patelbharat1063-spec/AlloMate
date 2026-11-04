@@ -109,7 +109,7 @@ firebase.auth().onAuthStateChanged(async user=>{
    if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();setSyncStatus('Cloud synced','synced')}
   },err=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Firestore listener',err)});
   if(!navigator.onLine)setSyncStatus('Offline · saved on device','offline');else if($('syncStatus').textContent!=='Cloud synced')setSyncStatus('Connected · checking sync','syncing');
- }catch(err){cloudReady=true;setSyncStatus('Local only · cloud unavailable','error');console.warn('Could not read cloud state',err);render()}
+ }catch(err){cloudReady=false;const code=err&&err.code?err.code:'unknown-error';setSyncStatus('Cloud unavailable · '+code,'error');console.error('Could not read cloud state:',code,err);render()}
 });
 window.addEventListener('online',()=>{if(currentUser){setSyncStatus('Back online · syncing','syncing');syncToCloud()}});
 window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('Offline · saved on device','offline')});
