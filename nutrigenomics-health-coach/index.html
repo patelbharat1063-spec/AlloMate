@@ -37,7 +37,7 @@ body.authenticated #authGate{display:none!important}
 <p id="authMessage" class="auth-status" role="status" aria-live="polite">Your account is required to open personal records.</p>
 <p class="small">Use a strong, unique password. Do not upload raw DNA files or highly sensitive medical details. This app provides educational journaling, not diagnosis or clinical genetic interpretation.</p>
 </section>
-<div id="accountBar" class="account-bar" hidden><span>Signed in as <b id="accountEmail"></b></span><span id="syncIndicator" class="sync-indicator" data-state="syncing" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Checking sync…</span></span><button type="button" class="secondary" id="signOutBtn">Sign out</button></div>
+<div id="accountBar" class="account-bar"><span id="accountLabel">Account: <b id="accountEmail">Not signed in</b></span><span id="syncIndicator" class="sync-indicator" data-state="pending" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Sign in to enable cloud sync</span></span><button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button></div>
 
 <div id="privacyNotice" class="notice"><b>Privacy & safety:</b> Journal data is stored locally for offline access and synchronized to your private Firebase account when connected. Firebase security rules must be published before public use. Do not upload raw DNA files or highly sensitive medical details. This tool does not diagnose, prescribe, or interpret DNA variants clinically.</div>
 <div class="tabs" role="tablist"><button class="active" data-tab="home">Overview</button><button data-tab="profile">My profile</button><button data-tab="assessment">Health check-in</button><button data-tab="meals">Meal journal</button><button data-tab="dna">DNA reports</button><button data-tab="insights">Insights</button><button data-tab="backup">Backup & settings</button></div>
@@ -91,13 +91,13 @@ $('signOutBtn').addEventListener('click',()=>firebase.auth().signOut());
 firebase.auth().onAuthStateChanged(async user=>{
  if(cloudUnsubscribe){cloudUnsubscribe();cloudUnsubscribe=null}
  currentUser=user;cloudReady=false;
- if(!user){document.body.classList.remove('authenticated');$('accountBar').hidden=true;data=emptyData();return}
+ if(!user){document.body.classList.remove('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent='Not signed in';$('signOutBtn').hidden=true;setSyncStatus('Sign in to enable cloud sync','pending');data=emptyData();return}
  KEY=BASE_KEY+'.'+user.uid;data=emptyData();load();
  const legacy=localStorage.getItem(BASE_KEY);
  if(legacy&&!localStorage.getItem(KEY)){
   try{const parsed=JSON.parse(legacy);if(parsed&&parsed.version===1&&parsed.data&&confirm('This device has older local Nutrigenomics records. Move a copy into the signed-in account? The original local backup will be kept.')){data=mergeData(data,parsed.data);persistLocal()}}catch(e){console.warn('Legacy local data was not migrated',e)}
  }
- document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';setSyncStatus('Connecting to cloud…','syncing');render();
+ document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';$('signOutBtn').hidden=false;setSyncStatus('Connecting to cloud…','syncing');render();
  const ref=firebase.firestore().collection('users').doc(user.uid).collection('private').doc('state');
  try{
   const snap=await ref.get();
