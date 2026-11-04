@@ -24,7 +24,7 @@ body.authenticated #authGate{display:none!important}
 <body>
 <header><h1>🌿 Nutrigenomics AI Health Coach</h1><p>Personal nutrition journal · DNA report organiser · wellness insights</p></header>
 <main class="wrap">
-<div id="accountBar" class="account-bar"><span id="accountLabel">Account: <b id="accountEmail">Not signed in</b></span><span id="syncIndicator" class="sync-indicator" data-state="pending" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Sign in to enable cloud sync</span></span><button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button></div>
+<div id="accountBar" class="account-bar"><span id="accountLabel">Account: <b id="accountEmail">Not signed in</b></span><span id="syncIndicator" class="sync-indicator" data-state="pending" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Firebase disconnected · sign in</span></span><button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button></div>
 <section id="authGate" class="auth-gate">
 <h2>Sign in to your private wellness account</h2>
 <p class="muted">Register or sign in to keep your journal associated with your account and synchronize it through Firebase. Each account has its own private records.</p>
@@ -58,7 +58,7 @@ function emptyData(){return {profile:{},checks:[],meals:[],dna:[]}}
 function persistLocal(){const stamp=new Date().toISOString();localUpdatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify({version:1,data,updatedAt:stamp}))}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(x&&x.version===1){data={...emptyData(),...x.data};localUpdatedAt=Date.parse(x.updatedAt)||0}}catch(e){console.warn('Local data could not be read',e)}}
 function mergeData(a,b){const out={...emptyData(),...b};out.profile=(a.profile&&Object.keys(a.profile).length)?a.profile:(b.profile||{});for(const k of ['checks','meals','dna']){const map=new Map();(b[k]||[]).forEach(x=>map.set(x.id,x));(a[k]||[]).forEach(x=>map.set(x.id,x));out[k]=Array.from(map.values())}return out}
-function syncToCloud(){if(!currentUser||!cloudReady||!navigator.onLine)return;try{setSyncStatus('Syncing…','syncing');firebase.firestore().collection('users').doc(currentUser.uid).collection('private').doc('state').set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{setSyncStatus('Cloud synced','synced')}).catch(e=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Cloud sync pending',e)})}catch(e){const code=e&&e.code?e.code:(e&&e.message?e.message:'unknown-error');setSyncStatus('Cloud unavailable · '+code,'error');console.error('Cloud sync setup failed:',code,e)}}
+function syncToCloud(){if(!currentUser||!cloudReady||!navigator.onLine)return;try{setSyncStatus('Firebase connected · syncing…','syncing');firebase.firestore().collection('users').doc(currentUser.uid).collection('private').doc('state').set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{setSyncStatus('Firebase connected · cloud synced','synced')}).catch(e=>{setSyncStatus('Firebase connected · sync pending','pending');console.warn('Cloud sync pending',e)})}catch(e){const code=e&&e.code?e.code:(e&&e.message?e.message:'unknown-error');setSyncStatus('Firebase connection failed · '+code,'error');console.error('Cloud sync setup failed:',code,e)}}
 function save(){persistLocal();render();syncToCloud()}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function id(){return 'NHC-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
@@ -91,13 +91,13 @@ $('signOutBtn').addEventListener('click',()=>firebase.auth().signOut());
 firebase.auth().onAuthStateChanged(async user=>{
  if(cloudUnsubscribe){cloudUnsubscribe();cloudUnsubscribe=null}
  currentUser=user;cloudReady=false;
- if(!user){document.body.classList.remove('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent='Not signed in';$('signOutBtn').hidden=true;setSyncStatus('Sign in to enable cloud sync','pending');data=emptyData();return}
+ if(!user){document.body.classList.remove('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent='Not signed in';$('signOutBtn').hidden=true;setSyncStatus('Firebase disconnected · sign in','pending');data=emptyData();return}
  KEY=BASE_KEY+'.'+user.uid;data=emptyData();load();
  const legacy=localStorage.getItem(BASE_KEY);
  if(legacy&&!localStorage.getItem(KEY)){
   try{const parsed=JSON.parse(legacy);if(parsed&&parsed.version===1&&parsed.data&&confirm('This device has older local Nutrigenomics records. Move a copy into the signed-in account? The original local backup will be kept.')){data=mergeData(data,parsed.data);persistLocal()}}catch(e){console.warn('Legacy local data was not migrated',e)}
  }
- document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';$('signOutBtn').hidden=false;setSyncStatus('Connecting to cloud…','syncing');render();
+ document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';$('signOutBtn').hidden=false;setSyncStatus('Connecting to Firebase…','syncing');render();
  const ref=firebase.firestore().collection('users').doc(user.uid).collection('private').doc('state');
  try{
   const snap=await ref.get();
@@ -106,12 +106,12 @@ firebase.auth().onAuthStateChanged(async user=>{
   cloudUnsubscribe=ref.onSnapshot(s=>{
    if(!s.exists||!s.data().data||s.metadata.hasPendingWrites)return;
    const remoteTime=s.data().updatedAt&&s.data().updatedAt.toMillis?s.data().updatedAt.toMillis():0;
-   if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();setSyncStatus('Cloud synced','synced')}
-  },err=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Firestore listener',err)});
-  if(!navigator.onLine)setSyncStatus('Offline · saved on device','offline');else if($('syncStatus').textContent!=='Cloud synced')setSyncStatus('Connected · checking sync','syncing');
- }catch(err){cloudReady=false;const code=err&&err.code?err.code:'unknown-error';setSyncStatus('Cloud unavailable · '+code,'error');console.error('Could not read cloud state:',code,err);render()}
+   if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();setSyncStatus('Firebase connected · cloud synced','synced')}
+  },err=>{setSyncStatus('Firebase connected · sync pending','pending');console.warn('Firestore listener',err)});
+  if(!navigator.onLine)setSyncStatus('Offline · Firebase unavailable · saved on device','offline');else if($('syncStatus').textContent!=='Cloud synced')setSyncStatus('Firebase connected · checking sync','syncing');
+ }catch(err){cloudReady=false;const code=err&&err.code?err.code:'unknown-error';setSyncStatus('Firebase connection failed · '+code,'error');console.error('Could not read cloud state:',code,err);render()}
 });
-window.addEventListener('online',()=>{if(currentUser){setSyncStatus('Back online · syncing','syncing');syncToCloud()}});
-window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('Offline · saved on device','offline')});
+window.addEventListener('online',()=>{if(currentUser){setSyncStatus('Back online · reconnecting to Firebase…','syncing');syncToCloud()}});
+window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('Offline · Firebase unavailable · saved on device','offline')});
 })();
 </script></body></html>
