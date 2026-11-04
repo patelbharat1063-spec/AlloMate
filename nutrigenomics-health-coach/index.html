@@ -24,6 +24,7 @@ body.authenticated #authGate{display:none!important}
 <body>
 <header><h1>🌿 Nutrigenomics AI Health Coach</h1><p>Personal nutrition journal · DNA report organiser · wellness insights</p></header>
 <main class="wrap">
+<div id="accountBar" class="account-bar"><span id="accountLabel">Account: <b id="accountEmail">Not signed in</b></span><span id="syncIndicator" class="sync-indicator" data-state="pending" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Sign in to enable cloud sync</span></span><button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button></div>
 <section id="authGate" class="auth-gate">
 <h2>Sign in to your private wellness account</h2>
 <p class="muted">Register or sign in to keep your journal associated with your account and synchronize it through Firebase. Each account has its own private records.</p>
@@ -37,7 +38,6 @@ body.authenticated #authGate{display:none!important}
 <p id="authMessage" class="auth-status" role="status" aria-live="polite">Your account is required to open personal records.</p>
 <p class="small">Use a strong, unique password. Do not upload raw DNA files or highly sensitive medical details. This app provides educational journaling, not diagnosis or clinical genetic interpretation.</p>
 </section>
-<div id="accountBar" class="account-bar"><span id="accountLabel">Account: <b id="accountEmail">Not signed in</b></span><span id="syncIndicator" class="sync-indicator" data-state="pending" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Sign in to enable cloud sync</span></span><button type="button" class="secondary" id="signOutBtn" hidden>Sign out</button></div>
 
 <div id="privacyNotice" class="notice"><b>Privacy & safety:</b> Journal data is stored locally for offline access and synchronized to your private Firebase account when connected. Firebase security rules must be published before public use. Do not upload raw DNA files or highly sensitive medical details. This tool does not diagnose, prescribe, or interpret DNA variants clinically.</div>
 <div class="tabs" role="tablist"><button class="active" data-tab="home">Overview</button><button data-tab="profile">My profile</button><button data-tab="assessment">Health check-in</button><button data-tab="meals">Meal journal</button><button data-tab="dna">DNA reports</button><button data-tab="insights">Insights</button><button data-tab="backup">Backup & settings</button></div>
