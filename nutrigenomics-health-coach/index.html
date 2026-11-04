@@ -7,11 +7,39 @@
 <title>Nutrigenomics AI Health Coach</title>
 <style>
 :root{--bg:#f3f7f4;--card:#fff;--ink:#18312b;--muted:#61746c;--line:#dce7df;--green:#176b52;--soft:#e8f3ed;--orange:#a85b19}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,Segoe UI,sans-serif}header{background:linear-gradient(120deg,#123b35,#176b52);color:white;padding:25px max(18px,calc((100% - 1100px)/2))}header h1{margin:0 0 6px;font-size:clamp(23px,4vw,32px)}header p{margin:0;color:#d9eee4}.wrap{max-width:1100px;margin:auto;padding:18px}.notice{background:#fff6e9;border:1px solid #f0d6ae;color:#754511;border-radius:12px;padding:12px;margin:14px 0}.tabs{display:flex;gap:7px;overflow:auto;padding:4px 0 12px}.tabs button{white-space:nowrap;border:1px solid var(--line);background:white;color:var(--ink);padding:10px 13px;border-radius:10px;cursor:pointer}.tabs button.active{background:var(--green);color:white;border-color:var(--green)}section.panel{display:none;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px;margin-bottom:15px}section.panel.active{display:block}h2{font-size:20px;margin:0 0 14px}h3{font-size:16px;margin:16px 0 8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:5px}label{font-size:13px;color:var(--muted);font-weight:600}input,select,textarea{width:100%;padding:10px;border:1px solid #cbd9d0;border-radius:9px;font:inherit;background:white;color:var(--ink)}textarea{min-height:85px;resize:vertical}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}button.primary,.actions button{border:0;border-radius:9px;padding:10px 14px;background:var(--green);color:white;font-weight:650;cursor:pointer}.actions button.secondary{background:var(--soft);color:var(--green)}.actions button.danger{background:#fcebea;color:#9b2c26}.muted,.small{color:var(--muted)}.small{font-size:12px}.stat{padding:14px;background:var(--soft);border-radius:12px}.stat strong{display:block;font-size:25px}.entry{border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0}.entry-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.entry p{margin:6px 0;white-space:pre-wrap}.empty{padding:18px;color:var(--muted);text-align:center}.pill{display:inline-block;background:var(--soft);color:var(--green);padding:3px 8px;border-radius:30px;font-size:12px}footer{text-align:center;padding:25px;color:var(--muted);font-size:12px}@media(max-width:550px){.wrap{padding:12px}section.panel{padding:14px}}
-</style></head>
+
+.auth-gate{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;margin:14px 0}
+.auth-gate h2{margin:0 0 8px}.auth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.auth-status{min-height:22px;color:var(--muted);font-size:13px;margin-top:8px}
+.sync-indicator{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650}.sync-dot{width:9px;height:9px;border-radius:50%;background:#a1a1aa;flex:none}.sync-indicator[data-state="synced"] .sync-dot{background:#16834a}.sync-indicator[data-state="syncing"] .sync-dot{background:#d58a18;box-shadow:0 0 0 3px #f7e9c9}.sync-indicator[data-state="pending"],.sync-indicator[data-state="offline"],.sync-indicator[data-state="error"]{color:#9b2c26}.sync-indicator[data-state="pending"] .sync-dot,.sync-indicator[data-state="offline"] .sync-dot,.sync-indicator[data-state="error"] .sync-dot{background:#c0392b}.account-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#e8f3ed;padding:10px 12px;border-radius:10px;margin:12px 0}
+body:not(.authenticated) .tabs,body:not(.authenticated) section.panel:not(#authGate),body:not(.authenticated) #privacyNotice{display:none!important}
+#authGate{display:block!important}
+body.authenticated #authGate{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+</head>
 <body>
 <header><h1>🌿 Nutrigenomics AI Health Coach</h1><p>Personal nutrition journal · DNA report organiser · wellness insights</p></header>
 <main class="wrap">
-<div class="notice"><b>Privacy & safety:</b> This independent module stores information only in this browser. Browser storage is not encrypted and may be lost if site data is cleared. Do not enter highly sensitive genetic or medical details. This tool does not diagnose, prescribe, or interpret DNA variants clinically.</div>
+<section id="authGate" class="auth-gate">
+<h2>Sign in to your private wellness account</h2>
+<p class="muted">Register or sign in to keep your journal associated with your account and synchronize it through Firebase. Each account has its own private records.</p>
+<form id="signInForm">
+<div class="auth-grid">
+<div class="field"><label for="authEmail">Email address</label><input id="authEmail" type="email" autocomplete="username" required></div>
+<div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></div>
+</div>
+<div class="actions"><button type="submit">Sign in</button><button type="button" class="secondary" id="registerBtn">Create account</button><button type="button" class="secondary" id="resetPasswordBtn">Reset password</button></div>
+</form>
+<p id="authMessage" class="auth-status" role="status" aria-live="polite">Your account is required to open personal records.</p>
+<p class="small">Use a strong, unique password. Do not upload raw DNA files or highly sensitive medical details. This app provides educational journaling, not diagnosis or clinical genetic interpretation.</p>
+</section>
+<div id="accountBar" class="account-bar" hidden><span>Signed in as <b id="accountEmail"></b></span><span id="syncIndicator" class="sync-indicator" data-state="syncing" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Checking sync…</span></span><button type="button" class="secondary" id="signOutBtn">Sign out</button></div>
+
+<div id="privacyNotice" class="notice"><b>Privacy & safety:</b> Journal data is stored locally for offline access and synchronized to your private Firebase account when connected. Firebase security rules must be published before public use. Do not upload raw DNA files or highly sensitive medical details. This tool does not diagnose, prescribe, or interpret DNA variants clinically.</div>
 <div class="tabs" role="tablist"><button class="active" data-tab="home">Overview</button><button data-tab="profile">My profile</button><button data-tab="assessment">Health check-in</button><button data-tab="meals">Meal journal</button><button data-tab="dna">DNA reports</button><button data-tab="insights">Insights</button><button data-tab="backup">Backup & settings</button></div>
 <section id="home" class="panel active"><h2>Your wellness overview</h2><div class="grid"><div class="stat"><strong id="mealCount">0</strong><span>Meal entries</span></div><div class="stat"><strong id="dnaCount">0</strong><span>DNA reports registered</span></div><div class="stat"><strong id="checkCount">0</strong><span>Health check-ins</span></div></div><h3>Getting started</h3><p class="muted">Add your basic profile, record meals and symptoms, and register the details of any DNA report. Use Insights to review your journal patterns.</p><div class="notice">DNA test results require interpretation by a qualified clinical geneticist or healthcare professional. A gene variant alone does not determine your diet or health outcome.</div></section>
 <section id="profile" class="panel"><h2>My profile</h2><form id="profileForm"><div class="grid"><div class="field"><label>Display name</label><input id="pName" maxlength="80"></div><div class="field"><label>Date of birth (optional)</label><input id="pDob" type="date"></div><div class="field"><label>Preferred language</label><select id="pLang"><option value="en">English</option><option value="gu">ગુજરાતી</option></select></div><div class="field"><label>Diet preference</label><select id="pDiet"><option value="">Not specified</option><option>Vegetarian</option><option>Vegan</option><option>Eggetarian</option><option>Omnivore</option><option>Other</option></select></div><div class="field"><label>Food allergies / avoidances</label><input id="pAllergy" maxlength="500" placeholder="Optional"></div><div class="field"><label>General goal</label><select id="pGoal"><option value="">Not specified</option><option>Balanced nutrition</option><option>Weight management</option><option>Fitness support</option><option>Digestive wellness</option><option>Healthy ageing</option></select></div></div><div class="field" style="margin-top:12px"><label>Notes (avoid confidential medical details)</label><textarea id="pNotes" maxlength="1500"></textarea></div><div class="actions"><button>Save profile</button></div></form></section>
@@ -23,10 +51,15 @@
 </main><footer>Independent AlloMate repository module · Not connected to AlloMate farm records · Version 0.1</footer>
 <script>
 (()=>{'use strict';
-const KEY='NutrigenomicsHealthCoach.v1';const $=id=>document.getElementById(id);const today=()=>new Date().toISOString().slice(0,10);
-let data={profile:{},checks:[],meals:[],dna:[]};
-function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(x&&x.version===1)data={...data,...x.data}}catch(e){console.warn('Local data could not be read',e)}}
-function save(){localStorage.setItem(KEY,JSON.stringify({version:1,data,updatedAt:new Date().toISOString()}));render()}
+const BASE_KEY='NutrigenomicsHealthCoach.v1';let KEY=BASE_KEY;const $=id=>document.getElementById(id);const today=()=>new Date().toISOString().slice(0,10);
+let data={profile:{},checks:[],meals:[],dna:[]},currentUser=null,cloudReady=false,cloudUnsubscribe=null,localUpdatedAt=0;
+function setSyncStatus(message,state){$('syncStatus').textContent=message;$('syncIndicator').dataset.state=state||'syncing'}
+function emptyData(){return {profile:{},checks:[],meals:[],dna:[]}}
+function persistLocal(){const stamp=new Date().toISOString();localUpdatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify({version:1,data,updatedAt:stamp}))}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(x&&x.version===1){data={...emptyData(),...x.data};localUpdatedAt=Date.parse(x.updatedAt)||0}}catch(e){console.warn('Local data could not be read',e)}}
+function mergeData(a,b){const out={...emptyData(),...b};out.profile=(a.profile&&Object.keys(a.profile).length)?a.profile:(b.profile||{});for(const k of ['checks','meals','dna']){const map=new Map();(b[k]||[]).forEach(x=>map.set(x.id,x));(a[k]||[]).forEach(x=>map.set(x.id,x));out[k]=Array.from(map.values())}return out}
+function syncToCloud(){if(!currentUser||!cloudReady||!navigator.onLine)return;try{setSyncStatus('Syncing…','syncing');firebase.firestore().collection('users').doc(currentUser.uid).collection('private').doc('state').set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{setSyncStatus('Cloud synced','synced')}).catch(e=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Cloud sync pending',e)})}catch(e){setSyncStatus('Local only','offline');console.warn(e)}}
+function save(){persistLocal();render();syncToCloud()}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function id(){return 'NHC-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
 function showList(target,arr,fields){$(target).innerHTML=arr.length?arr.map(x=>'<article class="entry"><div class="entry-head"><b>'+esc(fields.title(x))+'</b><span class="pill">'+esc(fields.date(x)||'No date')+'</span></div><p>'+esc(fields.body(x))+'</p><button class="secondary" data-del="'+esc(x.id)+'" data-kind="'+target+'">Delete</button></article>').join(''):'<div class="empty">No entries yet.</div>'}
@@ -49,6 +82,36 @@ $('clearBtn').onclick=()=>{if(confirm('Delete all local Nutrigenomics app record
 let installPrompt;$('installBtn').addEventListener('click',async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installBtn').hidden=true}});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('installBtn').hidden=false});
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
-$('cDate').value=$('mDate').value=today();load();render();
+$('cDate').value=$('mDate').value=today();
+function authMessage(msg){$('authMessage').textContent=msg}
+$('signInForm').addEventListener('submit',async e=>{e.preventDefault();authMessage('Signing in…');try{await firebase.auth().signInWithEmailAndPassword($('authEmail').value.trim(),$('authPassword').value)}catch(err){authMessage(err.message)}});
+$('registerBtn').addEventListener('click',async()=>{authMessage('Creating account…');try{await firebase.auth().createUserWithEmailAndPassword($('authEmail').value.trim(),$('authPassword').value);authMessage('Account created. You are signed in.')}catch(err){authMessage(err.message)}});
+$('resetPasswordBtn').addEventListener('click',async()=>{const email=$('authEmail').value.trim();if(!email){authMessage('Enter your email address first.');return}try{await firebase.auth().sendPasswordResetEmail(email);authMessage('Password reset email sent if this address is registered.')}catch(err){authMessage(err.message)}});
+$('signOutBtn').addEventListener('click',()=>firebase.auth().signOut());
+firebase.auth().onAuthStateChanged(async user=>{
+ if(cloudUnsubscribe){cloudUnsubscribe();cloudUnsubscribe=null}
+ currentUser=user;cloudReady=false;
+ if(!user){document.body.classList.remove('authenticated');$('accountBar').hidden=true;data=emptyData();return}
+ KEY=BASE_KEY+'.'+user.uid;data=emptyData();load();
+ const legacy=localStorage.getItem(BASE_KEY);
+ if(legacy&&!localStorage.getItem(KEY)){
+  try{const parsed=JSON.parse(legacy);if(parsed&&parsed.version===1&&parsed.data&&confirm('This device has older local Nutrigenomics records. Move a copy into the signed-in account? The original local backup will be kept.')){data=mergeData(data,parsed.data);persistLocal()}}catch(e){console.warn('Legacy local data was not migrated',e)}
+ }
+ document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';setSyncStatus('Connecting to cloud…','syncing');render();
+ const ref=firebase.firestore().collection('users').doc(user.uid).collection('private').doc('state');
+ try{
+  const snap=await ref.get();
+  if(snap.exists&&snap.data().data)data=mergeData(data,snap.data().data);
+  persistLocal();cloudReady=true;render();syncToCloud();
+  cloudUnsubscribe=ref.onSnapshot(s=>{
+   if(!s.exists||!s.data().data||s.metadata.hasPendingWrites)return;
+   const remoteTime=s.data().updatedAt&&s.data().updatedAt.toMillis?s.data().updatedAt.toMillis():0;
+   if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();setSyncStatus('Cloud synced','synced')}
+  },err=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Firestore listener',err)});
+  if(!navigator.onLine)setSyncStatus('Offline · saved on device','offline');else if($('syncStatus').textContent!=='Cloud synced')setSyncStatus('Connected · checking sync','syncing');
+ }catch(err){cloudReady=true;setSyncStatus('Local only · cloud unavailable','error');console.warn('Could not read cloud state',err);render()}
+});
+window.addEventListener('online',()=>{if(currentUser){setSyncStatus('Back online · syncing','syncing');syncToCloud()}});
+window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('Offline · saved on device','offline')});
 })();
 </script></body></html>
