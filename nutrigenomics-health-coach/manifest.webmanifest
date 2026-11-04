@@ -1,10 +1,10 @@
 {
-  "name": "Nutrigenomics AI Health Coach",
+  "name": "Nutrigenomics Health Coach",
   "short_name": "Nutrigenomics",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3f7f4",
   "theme_color": "#123b35",
-  "description": "Independent offline-first personal nutrition and nutrigenomics journal."
+  "description": "Private non-commercial nutrigenomics wellness service workspace."
 }
