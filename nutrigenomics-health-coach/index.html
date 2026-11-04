@@ -11,7 +11,7 @@
 .auth-gate{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;margin:14px 0}
 .auth-gate h2{margin:0 0 8px}.auth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .auth-status{min-height:22px;color:var(--muted);font-size:13px;margin-top:8px}
-.account-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#e8f3ed;padding:10px 12px;border-radius:10px;margin:12px 0}
+.sync-indicator{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650}.sync-dot{width:9px;height:9px;border-radius:50%;background:#a1a1aa;flex:none}.sync-indicator[data-state="synced"] .sync-dot{background:#16834a}.sync-indicator[data-state="syncing"] .sync-dot{background:#d58a18;box-shadow:0 0 0 3px #f7e9c9}.sync-indicator[data-state="pending"],.sync-indicator[data-state="offline"],.sync-indicator[data-state="error"]{color:#9b2c26}.sync-indicator[data-state="pending"] .sync-dot,.sync-indicator[data-state="offline"] .sync-dot,.sync-indicator[data-state="error"] .sync-dot{background:#c0392b}.account-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#e8f3ed;padding:10px 12px;border-radius:10px;margin:12px 0}
 body:not(.authenticated) .tabs,body:not(.authenticated) section.panel:not(#authGate),body:not(.authenticated) #privacyNotice{display:none!important}
 #authGate{display:block!important}
 body.authenticated #authGate{display:none!important}
@@ -37,7 +37,7 @@ body.authenticated #authGate{display:none!important}
 <p id="authMessage" class="auth-status" role="status" aria-live="polite">Your account is required to open personal records.</p>
 <p class="small">Use a strong, unique password. Do not upload raw DNA files or highly sensitive medical details. This app provides educational journaling, not diagnosis or clinical genetic interpretation.</p>
 </section>
-<div id="accountBar" class="account-bar" hidden><span>Signed in as <b id="accountEmail"></b> · <span id="syncStatus">Connecting…</span></span><button type="button" class="secondary" id="signOutBtn">Sign out</button></div>
+<div id="accountBar" class="account-bar" hidden><span>Signed in as <b id="accountEmail"></b></span><span id="syncIndicator" class="sync-indicator" data-state="syncing" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus">Checking sync…</span></span><button type="button" class="secondary" id="signOutBtn">Sign out</button></div>
 
 <div id="privacyNotice" class="notice"><b>Privacy & safety:</b> Journal data is stored locally for offline access and synchronized to your private Firebase account when connected. Firebase security rules must be published before public use. Do not upload raw DNA files or highly sensitive medical details. This tool does not diagnose, prescribe, or interpret DNA variants clinically.</div>
 <div class="tabs" role="tablist"><button class="active" data-tab="home">Overview</button><button data-tab="profile">My profile</button><button data-tab="assessment">Health check-in</button><button data-tab="meals">Meal journal</button><button data-tab="dna">DNA reports</button><button data-tab="insights">Insights</button><button data-tab="backup">Backup & settings</button></div>
@@ -53,11 +53,12 @@ body.authenticated #authGate{display:none!important}
 (()=>{'use strict';
 const BASE_KEY='NutrigenomicsHealthCoach.v1';let KEY=BASE_KEY;const $=id=>document.getElementById(id);const today=()=>new Date().toISOString().slice(0,10);
 let data={profile:{},checks:[],meals:[],dna:[]},currentUser=null,cloudReady=false,cloudUnsubscribe=null,localUpdatedAt=0;
+function setSyncStatus(message,state){$('syncStatus').textContent=message;$('syncIndicator').dataset.state=state||'syncing'}
 function emptyData(){return {profile:{},checks:[],meals:[],dna:[]}}
 function persistLocal(){const stamp=new Date().toISOString();localUpdatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify({version:1,data,updatedAt:stamp}))}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(x&&x.version===1){data={...emptyData(),...x.data};localUpdatedAt=Date.parse(x.updatedAt)||0}}catch(e){console.warn('Local data could not be read',e)}}
 function mergeData(a,b){const out={...emptyData(),...b};out.profile=(a.profile&&Object.keys(a.profile).length)?a.profile:(b.profile||{});for(const k of ['checks','meals','dna']){const map=new Map();(b[k]||[]).forEach(x=>map.set(x.id,x));(a[k]||[]).forEach(x=>map.set(x.id,x));out[k]=Array.from(map.values())}return out}
-function syncToCloud(){if(!currentUser||!cloudReady||!navigator.onLine)return;try{$('syncStatus').textContent='Syncing…';firebase.firestore().collection('users').doc(currentUser.uid).collection('private').doc('state').set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{$('syncStatus').textContent='Cloud synced'}).catch(e=>{$('syncStatus').textContent='Offline / sync pending';console.warn('Cloud sync pending',e)})}catch(e){$('syncStatus').textContent='Local only';console.warn(e)}}
+function syncToCloud(){if(!currentUser||!cloudReady||!navigator.onLine)return;try{setSyncStatus('Syncing…','syncing');firebase.firestore().collection('users').doc(currentUser.uid).collection('private').doc('state').set({data,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{setSyncStatus('Cloud synced','synced')}).catch(e=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Cloud sync pending',e)})}catch(e){setSyncStatus('Local only','offline');console.warn(e)}}
 function save(){persistLocal();render();syncToCloud()}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function id(){return 'NHC-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
@@ -96,7 +97,7 @@ firebase.auth().onAuthStateChanged(async user=>{
  if(legacy&&!localStorage.getItem(KEY)){
   try{const parsed=JSON.parse(legacy);if(parsed&&parsed.version===1&&parsed.data&&confirm('This device has older local Nutrigenomics records. Move a copy into the signed-in account? The original local backup will be kept.')){data=mergeData(data,parsed.data);persistLocal()}}catch(e){console.warn('Legacy local data was not migrated',e)}
  }
- document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';$('syncStatus').textContent='Loading cloud records…';render();
+ document.body.classList.add('authenticated');$('accountBar').hidden=false;$('accountEmail').textContent=user.email||'Account';setSyncStatus('Connecting to cloud…','syncing');render();
  const ref=firebase.firestore().collection('users').doc(user.uid).collection('private').doc('state');
  try{
   const snap=await ref.get();
@@ -105,12 +106,12 @@ firebase.auth().onAuthStateChanged(async user=>{
   cloudUnsubscribe=ref.onSnapshot(s=>{
    if(!s.exists||!s.data().data||s.metadata.hasPendingWrites)return;
    const remoteTime=s.data().updatedAt&&s.data().updatedAt.toMillis?s.data().updatedAt.toMillis():0;
-   if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();$('syncStatus').textContent='Cloud synced'}
-  },err=>{$('syncStatus').textContent='Offline / sync pending';console.warn('Firestore listener',err)});
-  $('syncStatus').textContent=navigator.onLine?'Cloud connected':'Offline · local mode';
- }catch(err){cloudReady=true;$('syncStatus').textContent='Offline · local mode';console.warn('Could not read cloud state',err);render()}
+   if(remoteTime>localUpdatedAt){data={...emptyData(),...s.data().data};persistLocal();render();setSyncStatus('Cloud synced','synced')}
+  },err=>{setSyncStatus('Sync pending · will retry','pending');console.warn('Firestore listener',err)});
+  if(!navigator.onLine)setSyncStatus('Offline · saved on device','offline');else if($('syncStatus').textContent!=='Cloud synced')setSyncStatus('Connected · checking sync','syncing');
+ }catch(err){cloudReady=true;setSyncStatus('Local only · cloud unavailable','error');console.warn('Could not read cloud state',err);render()}
 });
-window.addEventListener('online',()=>{if(currentUser){$('syncStatus').textContent='Back online · syncing';syncToCloud()}});
-window.addEventListener('offline',()=>{if(currentUser)$('syncStatus').textContent='Offline · changes saved on device'});
+window.addEventListener('online',()=>{if(currentUser){setSyncStatus('Back online · syncing','syncing');syncToCloud()}});
+window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('Offline · saved on device','offline')});
 })();
 </script></body></html>
