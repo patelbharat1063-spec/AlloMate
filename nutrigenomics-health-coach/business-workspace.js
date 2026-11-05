@@ -20,7 +20,7 @@ function installExtendedWorkspace(){
  const tabs=document.querySelector('.workspace-tabs');
  if(!tabs||$('workspacePlans'))return;
  tabs.insertAdjacentHTML('beforeend','<button data-wtab="workspaceAppointments">Appointments</button><button data-wtab="workspacePlans">Nutrition plans</button>');
- const stats=$('.workspace-stats');
+ const stats=document.querySelector('.workspace-stats');
  stats.insertAdjacentHTML('beforeend','<div class="workspace-stat"><b id="workspaceAppointmentCount">0</b><span>Appointments scheduled</span></div><div class="workspace-stat"><b id="workspacePlanCount">0</b><span>Nutrition plans</span></div>');
  const anchor=$('workspaceTools');
  anchor.insertAdjacentHTML('afterbegin','<div class="actions"><button type="button" class="workspace-secondary" id="workspaceActivityCsv">Export activity CSV</button></div>');
