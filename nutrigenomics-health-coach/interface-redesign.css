@@ -1,0 +1,96 @@
+/* Nutrigenomics Health Coach — refreshed consultant workspace UI */
+:root{--bg:#f4f6f2;--card:#fff;--ink:#172f29;--muted:#64766e;--line:#dfe7e0;--green:#176b52;--soft:#e8f2eb;--orange:#a85b19}
+body{background:#f4f6f2;color:#172f29;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.01em}
+body>header{padding:18px max(20px,calc((100% - 1380px)/2));background:linear-gradient(110deg,#102f29,#176b52);box-shadow:0 5px 22px #102f2918}
+body>header h1{font-size:clamp(21px,3vw,27px);letter-spacing:-.035em}
+body>header p{font-size:13px;opacity:.88}
+.wrap{max-width:1440px;padding:22px clamp(14px,2.5vw,34px) 40px}
+#accountBar{position:sticky;top:0;z-index:20;background:#fff;border:1px solid #e0e8e1;box-shadow:0 8px 24px #17392b0b;border-radius:14px;padding:12px 16px;margin:0 0 20px}
+#accountBar button{min-height:42px;border:0;border-radius:10px;padding:10px 16px;background:#e8f2eb;color:#176b52;font-weight:750;cursor:pointer}
+#authGate{max-width:760px;margin:36px auto;padding:clamp(20px,4vw,34px);border:1px solid #e0e8e1;border-radius:22px;box-shadow:0 16px 50px #17392b0d}
+#authGate h2{font-size:25px;letter-spacing:-.035em}
+#authGate form{margin-top:20px}
+#authGate input{min-height:48px}
+#authGate .actions button{min-height:46px;padding:11px 17px;border-radius:11px}
+#privacyNotice{border-radius:14px;padding:14px 17px;font-size:13px;line-height:1.55}
+.workspace-shell{display:grid;grid-template-columns:238px minmax(0,1fr);gap:0 24px;align-items:start;margin:0}
+.workspace-head{grid-column:1/-1;align-items:center;margin:0 0 16px;padding:6px 2px}
+.workspace-kicker{font-size:10px;letter-spacing:.17em;color:#628474}
+.workspace-title{font-size:clamp(25px,3vw,34px);font-weight:780;letter-spacing:-.045em;color:#17382e;margin:5px 0}
+.workspace-sub{font-size:13px;color:#74827b}
+.workspace-head>.pill{padding:8px 12px;background:#e8f2eb;color:#176b52;font-weight:750}
+.workspace-stats{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.workspace-stat{position:relative;overflow:hidden;min-height:102px;padding:17px 18px;background:#fff;border:1px solid #e2e9e3;border-radius:16px;box-shadow:0 7px 22px #17392b08}
+.workspace-stat:after{content:"";position:absolute;width:58px;height:58px;right:-18px;bottom:-20px;border-radius:50%;background:#e8f2eb}
+.workspace-stat b{position:relative;z-index:1;font-size:29px;line-height:1.1;letter-spacing:-.04em;color:#176b52}
+.workspace-stat span{position:relative;z-index:1;display:block;margin-top:8px;color:#738078;font-size:11px;font-weight:700;line-height:1.35}
+.workspace-tabs{grid-column:1;grid-row:3;position:sticky;top:82px;display:flex;flex-direction:column;gap:5px;overflow:visible;padding:10px;background:#fff;border:1px solid #e2e9e3;border-radius:17px;box-shadow:0 8px 25px #17392b08}
+.workspace-tabs button{display:flex;align-items:center;width:100%;min-height:46px;text-align:left;padding:11px 13px;border:1px solid transparent;border-radius:11px;background:transparent;color:#53685d;font-size:13px;font-weight:700;cursor:pointer;transition:background .16s ease,color .16s ease,transform .16s ease}
+.workspace-tabs button:hover{background:#f2f7f3;color:#176b52;transform:translateX(2px)}
+.workspace-tabs button.active{background:#176b52;color:#fff;box-shadow:0 6px 14px #176b5225}
+.workspace-panel{grid-column:2;grid-row:3;min-width:0;margin:0 0 16px;padding:clamp(18px,2.5vw,28px);background:#fff;border:1px solid #e2e9e3;border-radius:18px;box-shadow:0 9px 28px #17392b08}
+.workspace-panel h2{font-size:21px;letter-spacing:-.035em;color:#17382e;margin:0 0 7px}
+.workspace-panel h3{font-size:15px;color:#244b3c}
+.workspace-panel>.muted{font-size:13px;line-height:1.55}
+.workspace-form{gap:14px;margin-top:18px}
+.workspace-panel .field{gap:7px}
+.workspace-panel label{font-size:11px;letter-spacing:.025em;color:#64766e;font-weight:750}
+.workspace-panel input,.workspace-panel select,.workspace-panel textarea,#clientSearch{min-height:45px;padding:11px 12px;border:1px solid #dce6de;border-radius:10px;background:#fbfcfa;color:#19372d;font-size:13px;transition:border-color .15s,box-shadow .15s}
+.workspace-panel textarea{min-height:100px;line-height:1.5}
+.workspace-panel input:focus,.workspace-panel select:focus,.workspace-panel textarea:focus,#clientSearch:focus{outline:0;border-color:#43866a;box-shadow:0 0 0 3px #dcefe2}
+.workspace-panel .actions{gap:9px;margin-top:17px}
+.workspace-primary,.workspace-secondary,.workspace-panel .actions button{min-height:44px;padding:11px 16px;border-radius:10px;font-size:12px;font-weight:750;cursor:pointer}
+.workspace-primary{background:#176b52;color:#fff;box-shadow:0 5px 12px #176b5220}
+.workspace-primary:hover{background:#125940}
+.workspace-secondary{background:#edf4ee;color:#176b52}
+.workspace-toolbar{gap:10px;margin:18px 0 10px}
+.workspace-toolbar input{min-height:44px}
+.workspace-item{padding:16px;border:1px solid #e3eae4;border-radius:13px;background:#fcfdfb;transition:border-color .15s,box-shadow .15s}
+.workspace-item:hover{border-color:#c7dccd;box-shadow:0 5px 15px #17392b08}
+.workspace-item-top{align-items:center}
+.workspace-item-top>b{font-size:13px;color:#203e32}
+.workspace-item p{font-size:12px;line-height:1.65;color:#718078}
+.workspace-actions button{min-width:64px;min-height:39px;border-radius:9px;font-size:11px}
+.workspace-empty{padding:28px 16px;border:1px dashed #d7e3d9;background:#f8faf7;border-radius:13px;font-size:13px}
+.workspace-status,.workspace-note{font-size:12px;line-height:1.6}
+.workspace-list{gap:10px;margin-top:17px}
+.nhc-care-panel .notice{border-radius:12px;line-height:1.6}
+.nhc-care-panel .workspace-form{margin-top:18px}
+.legacy-tools{margin-top:28px;border:1px solid #dfe7e0;border-radius:14px;background:#f8faf7;padding:15px}
+.legacy-tools>summary{font-size:12px;color:#5b7467}
+.public-site{max-width:1320px}
+.public-nav{padding:16px 0}
+.consult-hero{border:1px solid #e0ebe2;box-shadow:0 16px 50px #17392b0b}
+.service-card{box-shadow:0 8px 24px #17392b08}
+button,a,input,select,textarea{ -webkit-tap-highlight-color:transparent}
+button:focus-visible,a:focus-visible{outline:3px solid #83b99a;outline-offset:3px}
+@media(max-width:1100px){.workspace-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.workspace-shell{grid-template-columns:210px minmax(0,1fr);gap:0 16px}}
+@media(max-width:760px){
+ .wrap{padding:14px 12px 28px}
+ #accountBar{position:relative;top:auto;padding:11px 12px}
+ .workspace-shell{display:block}
+ .workspace-head{margin-bottom:12px}
+ .workspace-title{font-size:25px}
+ .workspace-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:12px}
+ .workspace-stat{min-height:88px;padding:13px}
+ .workspace-stat b{font-size:25px}
+ .workspace-tabs{position:relative;top:auto;flex-direction:row;overflow-x:auto;gap:6px;margin:0 -1px 13px;padding:7px;border-radius:13px;scrollbar-width:thin}
+ .workspace-tabs button{flex:0 0 auto;width:auto;min-height:43px;white-space:nowrap;padding:10px 13px;font-size:12px}
+ .workspace-tabs button:hover{transform:none}
+ .workspace-panel{padding:17px;border-radius:15px;margin-bottom:13px}
+ .workspace-panel h2{font-size:19px}
+ .workspace-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+ .workspace-form .wide{grid-column:1/-1}
+}
+@media(max-width:460px){
+ body>header{padding:16px}
+ body>header p{font-size:11px}
+ .workspace-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .workspace-form{grid-template-columns:1fr}
+ .workspace-form .wide{grid-column:auto}
+ .workspace-panel{padding:15px}
+ .workspace-actions{gap:6px}
+ .workspace-actions button{flex:1}
+ .workspace-head>.pill{font-size:10px}
+ .account-bar{align-items:flex-start}
+}
