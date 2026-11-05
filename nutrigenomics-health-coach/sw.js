@@ -1,5 +1,5 @@
-const CACHE='nutrigenomics-health-coach-v3';
-const FILES=['./','./index.html','./manifest.webmanifest','./business-workspace.css?v=20261105-2','./business-workspace.js?v=20261105-2'];
+const CACHE='nutrigenomics-health-coach-v4';
+const FILES=['./','./index.html','./manifest.webmanifest','./business-workspace.css?v=20261105-3','./business-workspace.js?v=20261105-3'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
