@@ -17,7 +17,7 @@ function clientName(id){return records.clients.find(x=>x.id===id)?.name||'Client
 function item(title,sub,body,id,type){return '<article class="workspace-item"><div class="workspace-item-top"><b>'+safe(title)+'</b><span class="pill">'+safe(sub||'No date')+'</span></div><p>'+safe(body||'')+'</p><div class="workspace-actions"><button type="button" data-edit="'+safe(type)+'" data-id="'+safe(id)+'">Edit</button><button type="button" class="delete" data-remove="'+safe(type)+'" data-id="'+safe(id)+'">Delete</button></div></article>'}
 function renderList(target,arr,fn){$(target).innerHTML=arr.length?arr.map(fn).join(''):'<div class="workspace-empty">No records yet. Add the first entry above.</div>'}
 function installExtendedWorkspace(){
- const tabs=$('.workspace-tabs');
+ const tabs=document.querySelector('.workspace-tabs');
  if(!tabs||$('workspacePlans'))return;
  tabs.insertAdjacentHTML('beforeend','<button data-wtab="workspaceAppointments">Appointments</button><button data-wtab="workspacePlans">Nutrition plans</button>');
  const anchor=$('workspaceTools');
@@ -73,8 +73,8 @@ $('consultationForm').addEventListener('submit',e=>{e.preventDefault();const o={
 $('followupForm').addEventListener('submit',e=>{e.preventDefault();const o={id:edit.followup||newId(),clientId:formValue('followClient'),date:formValue('fuDate'),topic:formValue('fuTopic'),status:formValue('fuStatus'),notes:formValue('fuNotes'),updatedAt:new Date().toISOString()};if(!o.clientId){alert('Select a client first.');return}const i=records.followups.findIndex(x=>x.id===o.id);if(i>=0)records.followups[i]=o;else records.followups.unshift(o);clearForm('followup');save()});
 document.addEventListener('click',e=>{
  const tab=e.target.closest('[data-wtab]');if(tab){activate(tab.dataset.wtab);return}
- const del=e.target.closest('[data-remove]');if(del){const k=del.dataset.remove+'s';if(!confirm('Delete this '+del.dataset.remove+' record? Linked consultation and follow-up records will be kept.'))return;records[k]=records[k].filter(x=>x.id!==del.dataset.id);save();return}
- const ed=e.target.closest('[data-edit]');if(ed){const type=ed.dataset.edit,x=records[type+'s'].find(v=>v.id===ed.dataset.id);if(!x)return;edit[type]=x.id;
+ const del=e.target.closest('[data-remove]');if(del){const k=del.dataset.remove==='plan'?'plans':del.dataset.remove==='appointment'?'appointments':del.dataset.remove+'s';if(!confirm('Delete this '+del.dataset.remove+' record? Linked consultation and follow-up records will be kept.'))return;records[k]=records[k].filter(x=>x.id!==del.dataset.id);save();return}
+ const ed=e.target.closest('[data-edit]');if(ed){const type=ed.dataset.edit,key=type==='plan'?'plans':type==='appointment'?'appointments':type+'s',x=records[key].find(v=>v.id===ed.dataset.id);if(!x)return;edit[type]=x.id;
  const fields=type==='client'?{clCode:'code',clName:'name',clPhone:'phone',clEmail:'email',clAge:'age',clDiet:'diet',clGoal:'goal',clStatus:'status',clNotes:'notes'}:type==='consultation'?{consultClient:'clientId',coDate:'date',coType:'type',coSummary:'summary',coPlan:'plan',coNext:'nextDate'}:type==='followup'?{followClient:'clientId',fuDate:'date',fuTopic:'topic',fuStatus:'status',fuNotes:'notes'}:type==='appointment'?{apClient:'clientId',apDate:'date',apTime:'time',apMode:'mode',apStatus:'status',apTopic:'topic',apNotes:'notes'}:{plClient:'clientId',plTitle:'title',plDate:'date',plReview:'reviewDate',plStatus:'status',plGoals:'goals',plActions:'actions',plNotes:'notes'};
  Object.entries(fields).forEach(([id,key])=>$(id).value=x[key]??'');$(type+'Save').textContent='Update '+type;activate(type==='client'?'workspaceClients':type==='consultation'?'workspaceConsultations':type==='followup'?'workspaceFollowups':type==='appointment'?'workspaceAppointments':'workspacePlans');return}
 });
