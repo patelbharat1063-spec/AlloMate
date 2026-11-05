@@ -1,7 +1,7 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id), today=()=>new Date().toISOString().slice(0,10);
-const KEY='NHC.BusinessWorkspace.v1';let uid=null,db=null,cloudTimer=null,records={clients:[],consultations:[],followups:[],plans:[],appointments:[]},edit={client:null,consultation:null,followup:null,plan:null,appointment:null},active='workspaceHome';
-const blank=()=>({clients:[],consultations:[],followups:[],plans:[],appointments:[]});
+const KEY='NHC.BusinessWorkspace.v1';let uid=null,db=null,cloudTimer=null,records={clients:[],consultations:[],followups:[],plans:[],appointments:[],healthProfiles:[],geneticReports:[],progress:[],consents:[]},edit={client:null,consultation:null,followup:null,plan:null,appointment:null},active='workspaceHome';
+const blank=()=>({clients:[],consultations:[],followups:[],plans:[],appointments:[],healthProfiles:[],geneticReports:[],progress:[],consents:[]});
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const newId=()=> 'WS-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
 function localKey(){return KEY+'.'+uid}
@@ -93,4 +93,5 @@ $('workspaceClear').onclick=()=>{if(confirm('Delete all business workspace recor
 if(window.firebase?.auth&&window.firebase?.firestore){firebase.auth().onAuthStateChanged(async user=>{uid=user?.uid||null;db=firebase.firestore();if(!uid){records=blank();renderAll();status('Sign in to open your private business workspace.');return}loadLocal();renderAll();status('Loading private workspace…');try{const ref=db.collection('users').doc(uid).collection('private').doc('workspace');const snap=await ref.get();if(snap.exists&&snap.data().records){records=merge(records,snap.data().records);persist()}renderAll();status(navigator.onLine?'Private workspace ready · Firebase available':'Offline · workspace saved on this device');}catch(e){status('Workspace available locally · Firebase sync needs attention ('+(e.code||'connection')+').')} });}
 window.addEventListener('online',()=>{if(uid)save()});window.addEventListener('offline',()=>status('Offline · changes remain on this device until reconnecting'));
 $('clStatus').value='Active';$('clDiet').value='Not specified';$('coDate').value=today();$('fuDate').value=today();
+window.NHCWorkspace={get records(){return records},save,render:renderAll,activate,clientName,newId,status,today};
 })();
