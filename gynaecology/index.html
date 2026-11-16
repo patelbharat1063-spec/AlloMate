@@ -160,7 +160,7 @@ async function exportClinicBackup(){
 }
 $('backupBtn').addEventListener('click',exportClinicBackup);
 const bootOriginal=boot;
-boot=async function(){await bootOriginal();if(user&&clinic){$('backupBtn').classList.remove('hidden');setClinicLanguage(localStorage.getItem('gyn_language')||'en')}};
+boot=async function(){await bootOriginal();if(user&&clinic){if(role==='owner')$('backupBtn').classList.remove('hidden');setClinicLanguage(localStorage.getItem('gyn_language')||'en')}};
 const renderOriginal=render;
 render=function(){renderOriginal();setClinicLanguage(localStorage.getItem('gyn_language')||'en')};
 
