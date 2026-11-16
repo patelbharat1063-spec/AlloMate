@@ -2,9 +2,9 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123d39"><title>Gynaecology & Obstetrics Clinic</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--ink:#173b37;--muted:#667b77;--bg:#f3f7f5;--line:#dce8e3;--teal:#176b5b;--mint:#e5f3ed;--white:#fff;--rose:#fff0ef;--shadow:0 10px 30px #163b3210}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#1c302d;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}.top{background:linear-gradient(120deg,#123d39,#1b7564);color:white;padding:22px max(18px,calc((100% - 1180px)/2));display:flex;justify-content:space-between;align-items:center;gap:14px}.top h1{font-size:21px;margin:0}.top small{opacity:.8}.wrap{max-width:1180px;margin:22px auto;padding:0 16px}.panel,.card{background:white;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}.login{max-width:430px;margin:8vh auto}.hidden{display:none!important}.muted{color:var(--muted)}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.stat{font-size:27px;font-weight:750;color:var(--teal)}.nav{display:flex;gap:8px;overflow:auto;margin:18px 0}.nav button{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 15px;color:var(--ink)}.nav button.active{background:var(--teal);color:#fff;border-color:var(--teal)}h2{font-size:19px;margin:0 0 14px}h3{font-size:16px;margin:0 0 10px}label{display:block;font-size:13px;font-weight:650;color:#4c625d;margin:0 0 5px}input,select,textarea{width:100%;border:1px solid #cfddd7;border-radius:9px;padding:10px;background:#fff;color:#1c302d}textarea{min-height:76px;resize:vertical}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field.full{grid-column:1/-1}.btn{border:0;background:var(--teal);color:white;padding:10px 15px;border-radius:9px;font-weight:650}.btn.secondary{background:var(--mint);color:var(--ink)}.btn.danger{background:#a43c38}.btn:disabled{opacity:.5}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:580px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);font-size:14px}th{color:var(--muted);font-weight:650}.msg{padding:10px 12px;border-radius:9px;background:var(--mint);color:var(--ink);margin:10px 0}.msg.err{background:var(--rose);color:#9b302b}.pill{display:inline-block;border-radius:99px;background:var(--mint);padding:3px 9px;font-size:12px}.section{display:none}.section.active{display:block}.small{font-size:12px}.empty{text-align:center;padding:28px;color:var(--muted)}.brandmark{width:38px;height:38px;border-radius:12px;background:#ffffff22;display:grid;place-items:center;font-size:20px}@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.top{align-items:flex-start}.fields{grid-template-columns:1fr}.wrap{margin:14px auto}.panel{padding:14px}}@media(max-width:420px){.grid{grid-template-columns:1fr}.top h1{font-size:18px}}
+:root{--ink:#173b37;--muted:#667b77;--bg:#f3f7f5;--line:#dce8e3;--teal:#176b5b;--mint:#e5f3ed;--white:#fff;--rose:#fff0ef;--shadow:0 10px 30px #163b3210}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#1c302d;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}.top{background:linear-gradient(120deg,#123d39,#1b7564);color:white;padding:22px max(18px,calc((100% - 1180px)/2));display:flex;justify-content:space-between;align-items:center;gap:14px}.top h1{font-size:21px;margin:0}.top small{opacity:.8}.wrap{max-width:1180px;margin:22px auto;padding:0 16px}.panel,.card{background:white;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}.login{max-width:430px;margin:8vh auto}.hidden{display:none!important}.muted{color:var(--muted)}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.stat{font-size:27px;font-weight:750;color:var(--teal)}.nav{display:flex;gap:8px;overflow:auto;margin:18px 0}.nav button{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 15px;color:var(--ink)}.nav button.active{background:var(--teal);color:#fff;border-color:var(--teal)}h2{font-size:19px;margin:0 0 14px}h3{font-size:16px;margin:0 0 10px}label{display:block;font-size:13px;font-weight:650;color:#4c625d;margin:0 0 5px}input,select,textarea{width:100%;border:1px solid #cfddd7;border-radius:9px;padding:10px;background:#fff;color:#1c302d}textarea{min-height:76px;resize:vertical}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field.full{grid-column:1/-1}.btn{border:0;background:var(--teal);color:white;padding:10px 15px;border-radius:9px;font-weight:650}.btn.secondary{background:var(--mint);color:var(--ink)}.btn.danger{background:#a43c38}.btn:disabled{opacity:.5}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:580px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);font-size:14px}th{color:var(--muted);font-weight:650}.msg{padding:10px 12px;border-radius:9px;background:var(--mint);color:var(--ink);margin:10px 0}.msg.err{background:var(--rose);color:#9b302b}.pill{display:inline-block;border-radius:99px;background:var(--mint);padding:3px 9px;font-size:12px}.section{display:none}.section.active{display:block}.small{font-size:12px}.empty{text-align:center;padding:28px;color:var(--muted)}.brandmark{width:38px;height:38px;border-radius:12px;background:#ffffff22;display:grid;place-items:center;font-size:20px}@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.top{align-items:flex-start}.fields{grid-template-columns:1fr}.wrap{margin:14px auto}.panel{padding:14px}}@media(max-width:760px){.top .row:last-child{flex-wrap:wrap}.top .row:last-child button{min-height:44px}}@media(max-width:420px){.grid{grid-template-columns:1fr}.top h1{font-size:18px}}
 </style></head><body>
-<header class="top"><div class="row"><div class="brandmark">✚</div><div><h1>Gynaecology & Obstetrics Clinic</h1><small>Clinic management · Private workspace</small></div></div><div class="row"><span id="userLabel" class="small"></span><button id="logout" class="btn secondary hidden">Sign out</button></div></header>
+<header class="top"><div class="row"><div class="brandmark">✚</div><div><h1>Gynaecology & Obstetrics Clinic</h1><small>Clinic management · Private workspace</small></div></div><div class="row"><span id="userLabel" class="small"></span><button id="logout" class="btn secondary hidden">Sign out</button><button id="languageToggle" class="btn secondary" type="button" aria-label="Change language">ગુજરાતી</button><button id="backupBtn" class="btn secondary hidden" type="button">Export backup</button></div></header>
 <main class="wrap">
 <section id="loginPanel" class="panel login"><h2>Secure clinic login</h2><p class="muted">Sign in with your registered clinic account.</p><form id="loginForm"><div style="margin:12px 0"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div style="margin:12px 0"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><button class="btn" style="width:100%">Sign in</button></form><div id="loginMsg" aria-live="polite"></div><p class="small muted">Access is controlled by Supabase authentication and clinic membership. No public patient registration.</p></section>
 <section id="app" class="hidden">
@@ -72,5 +72,97 @@ bindInsert('deliveryForm','gyn_deliveries',p=>({patient_id:p.patient_id,pregnanc
 function updateTotal(){const f=$('billingForm');if(!f)return;const n=k=>Number(f.elements[k].value||0);$('invoiceTotal').textContent=Math.max(0,n('subtotal')-n('discount')+n('tax')).toFixed(2)}
 $('billingForm').addEventListener('input',updateTotal);
 $('billingForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,p=formObj(f),subtotal=Number(p.subtotal||0),discount=Number(p.discount||0),tax=Number(p.tax||0),total=Math.max(0,subtotal-discount+tax),paid=Number(p.paid_amount||0);if(paid>total){msg('billingMsg','Paid amount cannot exceed invoice total.',true);return}const payload={clinic_id:clinic.id,patient_id:p.patient_id,invoice_number:p.invoice_number,invoice_date:p.invoice_date||new Date().toISOString().slice(0,10),subtotal,discount,tax,total,paid_amount:paid,payment_status:paid===0?'unpaid':paid>=total?'paid':'partial',payment_method:p.payment_method||null,notes:p.notes||null};const {error}=await db.from('gyn_billing').insert(payload);if(error){msg('billingMsg',error.message,true);return}f.reset();updateTotal();msg('billingMsg','Invoice saved.');};
+
+const I18N_GU={
+'Gynaecology & Obstetrics Clinic':'સ્ત્રીરોગ અને પ્રસૂતિ ક્લિનિક',
+'Clinic management · Private workspace':'ક્લિનિક વ્યવસ્થાપન · ખાનગી કાર્યસ્થળ',
+'Sign out':'સાઇન આઉટ','Export backup':'બેકઅપ નિકાસ','Secure clinic login':'સુરક્ષિત ક્લિનિક લૉગિન',
+'Sign in with your registered clinic account.':'તમારા નોંધાયેલા ક્લિનિક એકાઉન્ટથી સાઇન ઇન કરો.',
+'Email':'ઇમેઇલ','Password':'પાસવર્ડ','Sign in':'સાઇન ઇન',
+'Access is controlled by Supabase authentication and clinic membership. No public patient registration.':'પ્રવેશ Supabase પ્રમાણીકરણ અને ક્લિનિક સભ્યપદ દ્વારા નિયંત્રિત છે. જાહેર દર્દી નોંધણી ઉપલબ્ધ નથી.',
+'Cloud database connected':'ક્લાઉડ ડેટાબેઝ જોડાયેલ છે','Dashboard':'ડેશબોર્ડ','Patients':'દર્દીઓ','Appointments':'મુલાકાતો',
+'Pregnancy & ANC':'ગર્ભાવસ્થા અને ANC','Clinical records':'ક્લિનિકલ રેકોર્ડ','Billing':'બિલિંગ',
+"Today's appointments":'આજની મુલાકાતો','Patient register':'દર્દી રજિસ્ટર','+ Add patient':'+ દર્દી ઉમેરો',
+'Search patient name, ID or phone':'દર્દીનું નામ, ID અથવા ફોન શોધો','Patient ID':'દર્દી ID','Name':'નામ','Phone':'ફોન',
+'Blood group':'રક્ત જૂથ','Action':'ક્રિયા','Register patient':'દર્દીની નોંધણી','Full name *':'પૂરું નામ *',
+'Date of birth':'જન્મ તારીખ','Address':'સરનામું','Allergies':'એલર્જી','Medical history':'તબીબી ઇતિહાસ','Notes':'નોંધો',
+'Save patient':'દર્દી સાચવો','Cancel':'રદ કરો','Book appointment':'મુલાકાત બુક કરો','Patient *':'દર્દી *',
+'Date & time *':'તારીખ અને સમય *','Appointment type':'મુલાકાતનો પ્રકાર','Fee (₹)':'ફી (₹)','Reason / notes':'કારણ / નોંધો',
+'Upcoming & recent appointments':'આગામી અને તાજેતરની મુલાકાતો','Date/time':'તારીખ/સમય','Type':'પ્રકાર','Status':'સ્થિતિ',
+'Register pregnancy':'ગર્ભાવસ્થાની નોંધણી','LMP date':'છેલ્લી માસિક તારીખ','EDD (calculated from LMP)':'EDD (LMP પરથી ગણતરી)',
+'Gravida':'ગર્ભધારણ સંખ્યા','Para':'પ્રસૂતિ સંખ્યા','Previous abortions':'અગાઉના ગર્ભપાત',
+'Living children':'જીવિત બાળકો','Risk level':'જોખમ સ્તર','Clinical notes':'ક્લિનિકલ નોંધો','Save pregnancy':'ગર્ભાવસ્થા સાચવો',
+'Pregnancy register':'ગર્ભાવસ્થા રજિસ્ટર','Gestational age*':'ગર્ભાવસ્થાની ઉંમર*','Record ANC visit':'ANC મુલાકાત નોંધો',
+'Visit date':'મુલાકાત તારીખ','Blood pressure (systolic)':'બ્લડ પ્રેશર (સિસ્ટોલિક)','Blood pressure (diastolic)':'બ્લડ પ્રેશર (ડાયસ્ટોલિક)',
+'Weight (kg)':'વજન (કિગ્રા)','Fetal heart rate (bpm)':'ગર્ભના હૃદયના ધબકારા (bpm)',
+'Symptoms / assessment / plan':'લક્ષણો / મૂલ્યાંકન / યોજના','Next visit date':'આગામી મુલાકાત તારીખ',
+'Save ANC visit':'ANC મુલાકાત સાચવો','Prescriptions':'પ્રિસ્ક્રિપ્શન','Follow-up date':'ફોલો-અપ તારીખ',
+'Diagnosis / clinician notes':'નિદાન / ક્લિનિશિયન નોંધો','Medicine list (one medicine per line)':'દવાઓની યાદી (દરેક લાઇનમાં એક દવા)',
+'Advice':'સલાહ','Save prescription':'પ્રિસ્ક્રિપ્શન સાચવો','Investigations':'તપાસો','Investigation *':'તપાસ *',
+'Result date':'પરિણામ તારીખ','Result / notes':'પરિણામ / નોંધો','Save investigation':'તપાસ સાચવો','Ultrasound record':'અલ્ટ્રાસાઉન્ડ રેકોર્ડ',
+'Related pregnancy':'સંબંધિત ગર્ભાવસ્થા','Scan type':'સ્કેનનો પ્રકાર','Gestational age (weeks)':'ગર્ભાવસ્થાની ઉંમર (અઠવાડિયા)',
+'Clinician-entered findings':'ક્લિનિશિયન દ્વારા દાખલ કરેલ નિરીક્ષણ','Impression':'અભિપ્રાય','Save scan record':'સ્કેન રેકોર્ડ સાચવો',
+'Delivery record':'પ્રસૂતિ રેકોર્ડ','Delivery mode':'પ્રસૂતિનો પ્રકાર','Outcome':'પરિણામ','Newborn count':'નવજાત શિશુઓની સંખ્યા',
+'Maternal complications / newborn summary / notes':'માતાની જટિલતાઓ / નવજાત સારાંશ / નોંધો','Save delivery record':'પ્રસૂતિ રેકોર્ડ સાચવો',
+'Create invoice':'ઇન્વૉઇસ બનાવો','Invoice number *':'ઇન્વૉઇસ નંબર *','Invoice date':'ઇન્વૉઇસ તારીખ',
+'Subtotal (₹)':'ઉપકુલ (₹)','Discount (₹)':'ડિસ્કાઉન્ટ (₹)','Tax (₹)':'કર (₹)','Paid amount (₹)':'ચૂકવેલ રકમ (₹)',
+'Payment method':'ચુકવણી પદ્ધતિ','Invoice total: ₹':'ઇન્વૉઇસ કુલ: ₹',
+'Clinical record software only. It does not diagnose, prescribe, calculate clinical risk, or replace clinician judgement. Use only after completing privacy, access-control and workflow testing.':'આ માત્ર ક્લિનિકલ રેકોર્ડ સોફ્ટવેર છે. તે નિદાન, પ્રિસ્ક્રિપ્શન અથવા ક્લિનિકલ જોખમની ગણતરી કરતું નથી અને ક્લિનિશિયનના નિર્ણયનું સ્થાન લેતું નથી. ગોપનીયતા, પ્રવેશ નિયંત્રણ અને કાર્યપ્રવાહની ચકાસણી પછી જ ઉપયોગ કરો.',
+'No patients registered.':'કોઈ દર્દી નોંધાયેલ નથી.','No appointments yet.':'હજુ કોઈ મુલાકાત નથી.',
+'No ongoing pregnancies.':'ચાલુ ગર્ભાવસ્થા નથી.','No appointments scheduled for today.':'આજે કોઈ મુલાકાત નિર્ધારિત નથી.',
+'Select patient':'દર્દી પસંદ કરો','Consultation':'પરામર્શ','Antenatal':'પ્રસૂતિ પૂર્વ','Follow-up':'ફોલો-અપ','Scan':'સ્કેન','Procedure':'પ્રક્રિયા',
+'Not assessed':'મૂલ્યાંકન નથી','Low':'ઓછું','High':'ઊંચું','Select':'પસંદ કરો','Cash':'રોકડ','UPI':'UPI','Card':'કાર્ડ','Bank transfer':'બેંક ટ્રાન્સફર'
+};
+function setClinicLanguage(lang){
+ const gu=lang==='gu';document.documentElement.lang=gu?'gu':'en';
+ document.querySelectorAll('body *').forEach(el=>{
+   if(el.children.length===0 && el.tagName!=='SCRIPT' && el.tagName!=='STYLE'){
+     if(!el.dataset.originalText)el.dataset.originalText=el.textContent;
+     const original=el.dataset.originalText.trim();
+     if(original)el.textContent=gu?(I18N_GU[original]||el.dataset.originalText):el.dataset.originalText;
+   }
+   ['placeholder','aria-label','title'].forEach(attr=>{
+     if(el.hasAttribute(attr)){
+       const key='original'+attr;
+       if(!el.dataset[key])el.dataset[key]=el.getAttribute(attr);
+       const original=el.dataset[key];
+       if(attr==='placeholder' && gu){
+         const translated=I18N_GU[original];if(translated)el.setAttribute(attr,translated);
+       }else if(!gu)el.setAttribute(attr,original);
+     }
+   });
+ });
+ $('languageToggle').textContent=gu?'English':'ગુજરાતી';
+ localStorage.setItem('gyn_language',lang);
+}
+$('languageToggle').addEventListener('click',()=>setClinicLanguage((localStorage.getItem('gyn_language')||'en')==='en'?'gu':'en'));
+async function exportClinicBackup(){
+ if(!clinic||!user)return;
+ if(!confirm('This export contains confidential patient and clinical information. Save it only to an encrypted, access-controlled device. Continue?'))return;
+ const tables=['gyn_patients','gyn_appointments','gyn_pregnancies','gyn_anc_visits','gyn_prescriptions','gyn_investigations','gyn_ultrasounds','gyn_deliveries','gyn_billing','gyn_audit_logs','gyn_memberships'];
+ const backup={product:'Gynaecology & Obstetrics Clinic',format_version:1,exported_at:new Date().toISOString(),clinic_id:clinic.id,clinic_name:clinic.clinic_name,exported_by:user.email,data:{}};
+ try{
+   for(const table of tables){
+     const {data,error}=await db.from(table).select('*').eq('clinic_id',clinic.id);
+     if(error)throw error;
+     backup.data[table]=data||[];
+   }
+   const {data:clinicRows,error:clinicError}=await db.from('gyn_clinics').select('*').eq('id',clinic.id);
+   if(clinicError)throw clinicError;
+   backup.data.gyn_clinics=clinicRows||[];
+   const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+   const url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download='gyn-clinic-backup-'+new Date().toISOString().slice(0,10)+'.json';
+   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+   await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'backup_exported',entity_type:'clinic_backup',details:{format:'json',table_count:tables.length+1}});
+   alert('Backup exported. Keep the file secure; it contains sensitive health data.');
+ }catch(e){alert('Backup failed: '+e.message)}
+}
+$('backupBtn').addEventListener('click',exportClinicBackup);
+const bootOriginal=boot;
+boot=async function(){await bootOriginal();if(user&&clinic){$('backupBtn').classList.remove('hidden');setClinicLanguage(localStorage.getItem('gyn_language')||'en')}};
+const renderOriginal=render;
+render=function(){renderOriginal();setClinicLanguage(localStorage.getItem('gyn_language')||'en')};
+
 boot();
 </script></body></html>
