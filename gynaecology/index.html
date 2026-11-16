@@ -186,14 +186,42 @@ function dateOnly(d){return d?new Date(d+'T00:00:00').toLocaleDateString('en-IN'
 function ageWeeks(lmp){if(!lmp)return '—';const days=Math.floor((Date.now()-new Date(lmp+'T00:00:00').getTime())/86400000);return days<0?'Check LMP':Math.floor(days/7)+'w '+days%7+'d'}
 async function loadClinic(){const {data:memberships,error:membershipError}=await db.from('gyn_memberships').select('clinic_id,role,is_active').eq('user_id',user.id).eq('is_active',true);if(membershipError)throw new Error('Could not read clinic membership: '+membershipError.message);const membership=(memberships||[]).find(item=>item.clinic_id&&item.role);if(!membership)throw new Error('No active clinic membership is assigned to this account. The owner membership record was not returned.');const {data:clinicData,error:clinicError}=await db.from('gyn_clinics').select('id,clinic_name,timezone').eq('id',membership.clinic_id).single();if(clinicError)throw new Error('Membership found, but clinic profile could not be loaded: '+clinicError.message);clinic=clinicData;role=membership.role;$('clinicName').textContent=clinic.clinic_name;$('roleLabel').textContent='Signed in as '+role+' · '+user.email}
 async function loadAll(){const patientResult=await db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false});if(patientResult.error)throw patientResult.error;const appointmentResult=await db.from('gyn_appointments').select('*').eq('clinic_id',clinic.id).order('appointment_at',{ascending:false}).limit(150);if(appointmentResult.error)throw appointmentResult.error;const pregnancyResult=await db.from('gyn_pregnancies').select('*').eq('clinic_id',clinic.id).eq('status','ongoing').order('created_at',{ascending:false});if(pregnancyResult.error)throw pregnancyResult.error;patients=patientResult.data||[];appointments=appointmentResult.data||[];pregnancies=pregnancyResult.data||[];render()}
-function render(){const patientMap=Object.fromEntries(patients.map(patient=>[patient.id,patient]));$('statPatients').textContent=patients.length;$('statAppointments').textContent=appointments.length;$('statPregnancies').textContent=pregnancies.length;
-$('patientRows').innerHTML=patients.map(patient=>'<tr><td>'+esc(patient.patient_code)+'</td><td>'+esc(patient.full_name)+'</td><td>'+esc(patient.phone||'—')+'</td><td>'+esc(patient.blood_group||'—')+'</td><td><button class="btn secondary" data-edit="'+patient.id+'">Edit</button> <button class="btn secondary" data-print="'+patient.id+'">Print</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No patients registered.</td></tr>';
-$('appointmentPatient').innerHTML='<option value="">Select patient</option>'+patients.map(patient=>'<option value="'+patient.id+'">'+esc(patient.patient_code+' · '+patient.full_name)+'</option>').join('');
-$('pregPatient').innerHTML=$('appointmentPatient').innerHTML;
-$('appointmentRows').innerHTML=appointments.map(appointment=>'<tr><td>'+esc(isoLocal(appointment.appointment_at))+'</td><td>'+esc(patientMap[appointment.patient_id]?.full_name||'Patient')+'</td><td>'+esc(appointment.appointment_type)+'</td><td>'+esc(appointment.status)+'</td><td>'+(appointment.status==='scheduled'?'<button class="btn secondary" data-done="'+appointment.id+'">Mark done</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">No appointments yet.</td></tr>';
-$('pregnancyRows').innerHTML=pregnancies.map(pregnancy=>'<tr><td>'+esc(patientMap[pregnancy.patient_id]?.full_name||'Patient')+'</td><td>'+dateOnly(pregnancy.lmp_date)+'</td><td>'+dateOnly(pregnancy.edd_date)+'</td><td>'+ageWeeks(pregnancy.lmp_date)+'</td><td>'+esc(pregnancy.risk_level)+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">No ongoing pregnancies.</td></tr>';
-const today=new Date().toDateString(),todayAppointments=appointments.filter(appointment=>new Date(appointment.appointment_at).toDateString()===today);$('todayList').innerHTML=todayAppointments.map(appointment=>'<div class="row between" style="padding:9px 0;border-bottom:1px solid var(--line)"><span><b>'+esc(patientMap[appointment.patient_id]?.full_name||'Patient')+'</b><br><span class="small muted">'+esc(appointment.appointment_type)+'</span></span><span>'+esc(new Date(appointment.appointment_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}))+'</span></div>').join('')||'No appointments scheduled for today.';
-$('ancPregnancy').innerHTML='<option value="">Select pregnancy</option>'+pregnancies.map(pregnancy=>'<option value="'+pregnancy.id+'">'+esc((patientMap[pregnancy.patient_id]?.full_name||'Patient')+' · EDD '+(pregnancy.edd_date||'—'))+'</option>').join('')}
+function render(){
+ const patientById=new Map(patients.map(patientRecord=>[patientRecord.id,patientRecord]));
+ $('statPatients').textContent=String(patients.length);
+ $('statAppointments').textContent=String(appointments.length);
+ $('statPregnancies').textContent=String(pregnancies.length);
+ const patientRows=$('patientRows');
+ if(patientRows)patientRows.innerHTML=patients.length?patients.map(patientRecord=>'<tr><td>'+esc(patientRecord.patient_code)+'</td><td>'+esc(patientRecord.full_name)+'</td><td>'+esc(patientRecord.phone||'—')+'</td><td>'+esc(patientRecord.blood_group||'—')+'</td><td><button class="btn secondary" data-edit="'+esc(patientRecord.id)+'">Edit</button> <button class="btn secondary" data-print="'+esc(patientRecord.id)+'">Print</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No patients registered.</td></tr>';
+ const patientOptions='<option value="">Select patient</option>'+patients.map(patientRecord=>'<option value="'+esc(patientRecord.id)+'">'+esc((patientRecord.patient_code||'')+' · '+(patientRecord.full_name||''))+'</option>').join('');
+ if($('appointmentPatient'))$('appointmentPatient').innerHTML=patientOptions;
+ if($('pregPatient'))$('pregPatient').innerHTML=patientOptions;
+ const appointmentRows=$('appointmentRows');
+ if(appointmentRows)appointmentRows.innerHTML=appointments.length?appointments.map(appointmentRecord=>{
+  const patientRecord=patientById.get(appointmentRecord.patient_id);
+  const action=appointmentRecord.status==='scheduled'?'<button class="btn secondary" data-done="'+esc(appointmentRecord.id)+'">Mark done</button>':'—';
+  return '<tr><td>'+esc(isoLocal(appointmentRecord.appointment_at))+'</td><td>'+esc(patientRecord?.full_name||'Patient')+'</td><td>'+esc(appointmentRecord.appointment_type||'—')+'</td><td>'+esc(appointmentRecord.status||'—')+'</td><td>'+action+'</td></tr>';
+ }).join(''):'<tr><td colspan="5" class="empty">No appointments yet.</td></tr>';
+ const pregnancyRows=$('pregnancyRows');
+ if(pregnancyRows)pregnancyRows.innerHTML=pregnancies.length?pregnancies.map(pregnancyRecord=>{
+  const patientRecord=patientById.get(pregnancyRecord.patient_id);
+  return '<tr><td>'+esc(patientRecord?.full_name||'Patient')+'</td><td>'+esc(dateOnly(pregnancyRecord.lmp_date))+'</td><td>'+esc(dateOnly(pregnancyRecord.edd_date))+'</td><td>'+esc(ageWeeks(pregnancyRecord.lmp_date))+'</td><td>'+esc(pregnancyRecord.risk_level||'—')+'</td></tr>';
+ }).join(''):'<tr><td colspan="5" class="empty">No ongoing pregnancies.</td></tr>';
+ const todayKey=new Date().toDateString();
+ const todayAppointments=appointments.filter(appointmentRecord=>new Date(appointmentRecord.appointment_at).toDateString()===todayKey);
+ const todayList=$('todayList');
+ if(todayList)todayList.innerHTML=todayAppointments.length?todayAppointments.map(appointmentRecord=>{
+  const patientRecord=patientById.get(appointmentRecord.patient_id);
+  return '<div class="row between" style="padding:9px 0;border-bottom:1px solid var(--line)"><span><b>'+esc(patientRecord?.full_name||'Patient')+'</b><br><span class="small muted">'+esc(appointmentRecord.appointment_type||'')+'</span></span><span>'+esc(new Date(appointmentRecord.appointment_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}))+'</span></div>';
+ }).join(''):'No appointments scheduled for today.';
+ const pregnancyOptions='<option value="">Select pregnancy</option>'+pregnancies.map(pregnancyRecord=>{
+  const patientRecord=patientById.get(pregnancyRecord.patient_id);
+  return '<option value="'+esc(pregnancyRecord.id)+'">'+esc((patientRecord?.full_name||'Patient')+' · EDD '+(pregnancyRecord.edd_date||'—'))+'</option>';
+ }).join('');
+ if($('ancPregnancy'))$('ancPregnancy').innerHTML=pregnancyOptions;
+ fillPatientSelects();
+ setClinicLanguage(localStorage.getItem('gyn_language')||'en');
+}
 async function boot(){const {data:{session},error:sessionError}=await db.auth.getSession();if(sessionError)throw sessionError;if(!session)return;user=session.user;try{await loadClinic();$('loginPanel').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');$('userLabel').textContent=user.email;await loadAll()}catch(e){$('app').classList.add('hidden');$('loginPanel').classList.remove('hidden');$('logout').classList.add('hidden');msg('loginMsg','Signed in, but clinic setup did not finish: '+(e&&e.stack?e.stack:(e.message||String(e))),true);}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();msg('loginMsg','Signing in…');try{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){msg('loginMsg',error.message,true);return}await boot()}catch(error){msg('loginMsg',error.message||String(error),true)}});
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
@@ -210,7 +238,7 @@ $('lmpDate').onchange=()=>{const v=$('lmpDate').value;if(!v){$('eddDate').value=
 $('pregnancyForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,p=formObj(f);p.clinic_id=clinic.id;for(const k of ['gravida','para','abortion_count','living_children'])p[k]=p[k]===''?null:Number(p[k]);p.lmp_date=p.lmp_date||null;p.edd_date=p.edd_date||null;p.notes=p.notes||null;const {error}=await db.from('gyn_pregnancies').insert(p);if(error){msg('pregnancyMsg',error.message,true);return}f.reset();msg('pregnancyMsg','Pregnancy record saved.');await loadAll()};
 $('ancForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,p=formObj(f);const g=pregnancies.find(x=>x.id===p.pregnancy_id);if(!g){msg('ancMsg','Select a pregnancy.',true);return}const days=g.lmp_date?Math.max(0,Math.floor((new Date((p.visit_date||new Date().toISOString())+'Z').getTime()-new Date(g.lmp_date+'T00:00:00Z').getTime())/86400000)):null;const payload={clinic_id:clinic.id,pregnancy_id:p.pregnancy_id,visit_date:p.visit_date?new Date(p.visit_date).toISOString():new Date().toISOString(),gestational_weeks:days===null?null:Math.floor(days/7),gestational_days:days===null?null:days%7,bp_systolic:p.bp_systolic?Number(p.bp_systolic):null,bp_diastolic:p.bp_diastolic?Number(p.bp_diastolic):null,weight_kg:p.weight_kg?Number(p.weight_kg):null,fetal_heart_rate:p.fetal_heart_rate?Number(p.fetal_heart_rate):null,symptoms:p.symptoms||null,assessment:p.assessment||null,plan:p.plan||null,next_visit_date:p.next_visit_date||null};const {error}=await db.from('gyn_anc_visits').insert(payload);if(error){msg('ancMsg',error.message,true);return}f.reset();msg('ancMsg','ANC visit saved.');};
 function fillPatientSelects(){['rxPatient','investPatient','usPatient','deliveryPatient','billPatient'].forEach(id=>{const el=$(id);if(el)el.innerHTML='<option value="">Select patient</option>'+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('')});['usPregnancy','deliveryPregnancy'].forEach(id=>{const el=$(id);if(el)el.innerHTML='<option value="">None selected</option>'+pregnancies.map(g=>'<option value="'+g.id+'">'+esc(g.edd_date||'Pregnancy')+'</option>').join('')})}
-const baseRender=render;render=function(){baseRender();fillPatientSelects()};
+
 function bindInsert(formId,table,payloadFn,msgId){$(formId).onsubmit=async e=>{e.preventDefault();const payload=payloadFn(formObj(e.currentTarget));payload.clinic_id=clinic.id;const {error}=await db.from(table).insert(payload);if(error){msg(msgId,error.message,true);return}e.currentTarget.reset();msg(msgId,'Record saved.');await loadAll()}};
 bindInsert('rxForm','gyn_prescriptions',p=>({patient_id:p.patient_id,diagnosis:p.diagnosis||null,medicines:(p.medicines_text||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({instruction:x})),advice:p.advice||null,follow_up_date:p.follow_up_date||null}),'rxMsg');
 bindInsert('investForm','gyn_investigations',p=>({patient_id:p.patient_id,investigation_type:p.investigation_type,status:p.status,result_date:p.result_date||null,result_summary:p.result_summary||null}),'investMsg');
@@ -356,8 +384,7 @@ async function exportClinicBackup(){
 $('backupBtn').addEventListener('click',exportClinicBackup);
 const bootOriginal=boot;
 boot=async function(){await bootOriginal();if(user&&clinic){if(role==='owner')$('backupBtn').classList.remove('hidden');setClinicLanguage(localStorage.getItem('gyn_language')||'en')}};
-const renderOriginal=render;
-render=function(){renderOriginal();setClinicLanguage(localStorage.getItem('gyn_language')||'en')};
+
 
 
 let moduleData={};
