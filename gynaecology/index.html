@@ -32,7 +32,7 @@
 <section id="loginPanel" class="panel login"><h2>Secure clinic login</h2><p class="muted">Sign in with your registered clinic account.</p><form id="loginForm"><div style="margin:12px 0"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div style="margin:12px 0"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><button class="btn" style="width:100%">Sign in</button></form><div id="loginMsg" aria-live="polite"></div><p class="small muted">Access is controlled by Supabase authentication and clinic membership. No public patient registration.</p></section>
 <section id="app" class="hidden">
 <div class="row between"><div><strong id="clinicName">Clinic</strong><div class="muted small" id="roleLabel"></div></div><span class="pill">Cloud database connected</span></div>
-<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button><button data-tab="operations">Clinic operations</button><button data-tab="reports">Reports & documents</button></div>
+<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button><button data-tab="operations">Clinic operations</button><button data-tab="theatre">OT & procedures</button><button data-tab="reports">Reports & documents</button></div>
 <section id="dashboard" class="section active"><div class="grid"><div class="card"><div class="muted">Patients</div><div class="stat" id="statPatients">—</div></div><div class="card"><div class="muted">Appointments</div><div class="stat" id="statAppointments">—</div></div><div class="card"><div class="muted">Ongoing pregnancies</div><div class="stat" id="statPregnancies">—</div></div></div><div class="panel" style="margin-top:15px"><h2>Today's appointments</h2><div id="todayList" class="muted">Loading…</div></div></section>
 <section id="patients" class="section"><div class="panel"><div class="row between"><h2>Patient register</h2><button class="btn" id="newPatient">+ Add patient</button></div><input id="patientSearch" placeholder="Search patient name, ID or phone" style="margin:8px 0 14px"><div class="tablewrap"><table><thead><tr><th>Patient ID</th><th>Name</th><th>Phone</th><th>Blood group</th><th>Action</th></tr></thead><tbody id="patientRows"></tbody></table></div></div>
 <div id="patientFormPanel" class="panel hidden" style="margin-top:14px"><h2 id="patientFormTitle">Register patient</h2><form id="patientForm"><div class="fields"><div class="field"><label>Patient ID *</label><input name="patient_code" required placeholder="e.g. GYN-0001"></div><div class="field"><label>Full name *</label><input name="full_name" required></div><div class="field"><label>Date of birth</label><input name="date_of_birth" type="date"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Blood group</label><select name="blood_group"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div><div class="field full"><label>Address</label><textarea name="address"></textarea></div><div class="field"><label>Allergies</label><textarea name="allergies"></textarea></div><div class="field"><label>Medical history</label><textarea name="medical_history"></textarea></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div></div><div class="row" style="margin-top:14px"><button class="btn">Save patient</button><button type="button" class="btn secondary" id="cancelPatient">Cancel</button></div><div id="patientMsg"></div></form></div></section>
@@ -154,7 +154,7 @@
 </section>
 
 
-<section id="reports" class="section">
+<section id="theatre" class="section"><div class="panel"><h2>Operation theatre & procedure schedule</h2><p class="small muted">Scheduling and documentation only. Clinical suitability, anaesthesia, consent and procedure decisions remain with the responsible clinical team.</p><form id="theatreForm"><div class="fields"><div class="field"><label>Patient *</label><select id="theatrePatient" name="patient_id" required></select></div><div class="field"><label>Procedure *</label><input name="procedure_name" required placeholder="Procedure / surgery name"></div><div class="field"><label>Planned date & time *</label><input name="planned_at" type="datetime-local" required></div><div class="field"><label>Status</label><select name="procedure_status"><option value="planned">Planned</option><option value="preparation">Preparation</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div><div class="field full"><label>Anaesthesia plan (clinician-entered)</label><textarea name="anaesthesia_plan"></textarea></div><div class="field full"><label>Pre-operative notes</label><textarea name="pre_op_notes"></textarea></div><div class="field full"><label>Post-operative notes</label><textarea name="post_op_notes"></textarea></div></div><button class="btn" style="margin-top:12px">Save procedure record</button><div id="theatreMsg"></div></form></div><div class="panel" style="margin-top:14px"><h2>Scheduled & completed procedures</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Procedure</th><th>Planned at</th><th>Status</th><th>Consent verified</th></tr></thead><tbody id="theatreRows"></tbody></table></div></div></section>\n<section id="reports" class="section">
 <div class="panel"><h2>Secure patient document upload</h2><form id="attachmentForm"><div class="fields">
 <div class="field"><label>Patient *</label><select name="patient_id" id="attachmentPatient" required></select></div>
 <div class="field"><label>Document type</label><select name="entity_type"><option value="patient">Patient document</option><option value="pregnancy">Pregnancy</option><option value="anc_visit">ANC visit</option><option value="investigation">Investigation</option><option value="ultrasound">Ultrasound report</option><option value="delivery">Delivery</option><option value="consent">Consent</option><option value="fertility">Fertility</option></select></div>
@@ -255,7 +255,7 @@ const I18N_GU={
 'Sign in with your registered clinic account.':'તમારા નોંધાયેલા ક્લિનિક એકાઉન્ટથી સાઇન ઇન કરો.',
 'Email':'ઇમેઇલ','Password':'પાસવર્ડ','Sign in':'સાઇન ઇન',
 'Access is controlled by Supabase authentication and clinic membership. No public patient registration.':'પ્રવેશ Supabase પ્રમાણીકરણ અને ક્લિનિક સભ્યપદ દ્વારા નિયંત્રિત છે. જાહેર દર્દી નોંધણી ઉપલબ્ધ નથી.',
-'Cloud database connected':'ક્લાઉડ ડેટાબેઝ જોડાયેલ છે','Dashboard':'ડેશબોર્ડ','Patients':'દર્દીઓ','Appointments':'મુલાકાતો',
+'Cloud database connected':'ક્લાઉડ ડેટાબેઝ જોડાયેલ છે','Dashboard':'ડેશબોર્ડ','Patients':'દર્દીઓ','Appointments':'મુલાકાતો','OT & procedures':'ઓપરેશન થિયેટર અને પ્રક્રિયાઓ','Operation theatre & procedure schedule':'ઓપરેશન થિયેટર અને પ્રક્રિયાઓનું સમયપત્રક','Procedure *':'પ્રક્રિયા *','Planned date & time *':'નિયોજિત તારીખ અને સમય *','Save procedure record':'પ્રક્રિયા રેકોર્ડ સાચવો','Scheduled & completed procedures':'નિયોજિત અને પૂર્ણ થયેલી પ્રક્રિયાઓ',
 'Pregnancy & ANC':'ગર્ભાવસ્થા અને ANC','Clinical records':'ક્લિનિકલ રેકોર્ડ','Billing':'બિલિંગ',
 "Today's appointments":'આજની મુલાકાતો','Patient register':'દર્દી રજિસ્ટર','+ Add patient':'+ દર્દી ઉમેરો',
 'Search patient name, ID or phone':'દર્દીનું નામ, ID અથવા ફોન શોધો','Patient ID':'દર્દી ID','Name':'નામ','Phone':'ફોન',
@@ -362,7 +362,7 @@ $('languageToggle').addEventListener('click',()=>setClinicLanguage((localStorage
 async function exportClinicBackup(){
  if(!clinic||!user)return;
  if(!confirm('This export contains confidential patient and clinical information. Save it only to an encrypted, access-controlled device. Continue?'))return;
- const tables=['gyn_patients','gyn_appointments','gyn_pregnancies','gyn_anc_visits','gyn_prescriptions','gyn_investigations','gyn_ultrasounds','gyn_deliveries','gyn_billing','gyn_audit_logs','gyn_memberships','gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements'];
+ const tables=['gyn_patients','gyn_appointments','gyn_pregnancies','gyn_anc_visits','gyn_prescriptions','gyn_investigations','gyn_ultrasounds','gyn_deliveries','gyn_billing','gyn_audit_logs','gyn_memberships','gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_theatre_cases'];
  const backup={product:'Gynaecology & Obstetrics Clinic',format_version:1,exported_at:new Date().toISOString(),clinic_id:clinic.id,clinic_name:clinic.clinic_name,exported_by:user.email,data:{}};
  try{
    for(const table of tables){
@@ -388,7 +388,7 @@ boot=async function(){await bootOriginal();if(user&&clinic){if(role==='owner')$(
 
 
 let moduleData={};
-const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing'];
+const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing','gyn_theatre_cases'];
 async function loadModuleLists(){
  const results=await Promise.all(MODULE_TABLES.map(t=>db.from(t).select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)));
  results.forEach((row,i)=>{if(row.error)throw row.error;moduleData[MODULE_TABLES[i]]=row.data||[]});
@@ -396,7 +396,7 @@ async function loadModuleLists(){
 }
 function fillModuleSelects(){
  const patientOpts='<option value="">Select patient</option>'+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('');
- ['womenPatient','fertilityPatient','labourPatient','newbornMother','postPatient','consentPatient'].forEach(id=>{const el=$(id);if(el)el.innerHTML=patientOpts});
+ ['womenPatient','fertilityPatient','labourPatient','newbornMother','postPatient','consentPatient','theatrePatient'].forEach(id=>{const el=$(id);if(el)el.innerHTML=patientOpts});
  const pregOpts='<option value="">None selected</option>'+pregnancies.map(g=>'<option value="'+g.id+'">'+esc(g.edd_date||'Pregnancy')+'</option>').join('');
  if($('labourPregnancy'))$('labourPregnancy').innerHTML=pregOpts;
  const del=(moduleData.gyn_deliveries||[]).map(d=>'<option value="'+d.id+'">'+esc(d.delivery_mode||'Delivery')+' · '+esc(dateOnly((d.delivery_datetime||'').slice(0,10)))+'</option>').join('');
@@ -447,7 +447,7 @@ function renderModuleLists(){
  renderSafeTable('reminderRows',moduleData.gyn_reminders,['due_at','patient_id','reminder_type','channel','status']);
  renderSafeTable('waitlistRows',moduleData.gyn_waitlist,['patient_id','preferred_at','priority','status','reason']);
  renderSafeTable('medicineRows',moduleData.gyn_medicine_catalog,['medicine_name','generic_name','strength','dosage_form','unit_price']);
- renderSafeTable('inventoryRows',moduleData.gyn_inventory_items,['item_name','batch_number','expiry_date','quantity','reorder_level']);
+ renderSafeTable('inventoryRows',moduleData.gyn_inventory_items,['item_name','batch_number','expiry_date','quantity','reorder_level']);\n renderSafeTable('theatreRows',moduleData.gyn_theatre_cases,['patient_id','procedure_name','planned_at','procedure_status','consent_verified']);
  const attachmentTarget=$('attachmentRows');
  if(attachmentTarget){
   const documents=Array.isArray(moduleData.gyn_attachments)?moduleData.gyn_attachments:[];
@@ -479,7 +479,7 @@ bindModuleForm('fertilityCycleForm','gyn_fertility_cycles',['cycle_number']);
 bindModuleForm('labourForm','gyn_labour_records',[],['admitted_at','labour_onset_at','membrane_rupture_at','delivery_at']);
 bindModuleForm('newbornForm','gyn_newborn_records',['birth_weight_kg','apgar_1_min','apgar_5_min'],['birth_datetime']);
 bindModuleForm('postnatalForm','gyn_postnatal_visits',[],['visit_at']);
-bindModuleForm('consentForm','gyn_consents',[],['signed_at']);
+bindModuleForm('consentForm','gyn_consents',[],['signed_at']);\nbindModuleForm('theatreForm','gyn_theatre_cases',[],['planned_at']);
 
 function bindSimpleModuleForm(id,table,numberFields=[],dateTimeFields=[]){
  const form=$(id);if(!form)return;
