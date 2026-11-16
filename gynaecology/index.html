@@ -40,6 +40,7 @@
 <section id="pregnancy" class="section"><div class="panel"><h2>Register pregnancy</h2><form id="pregnancyForm"><div class="fields"><div class="field"><label>Patient *</label><select name="patient_id" id="pregPatient" required></select></div><div class="field"><label>LMP date</label><input name="lmp_date" id="lmpDate" type="date"></div><div class="field"><label>EDD (calculated from LMP)</label><input name="edd_date" id="eddDate" type="date"></div><div class="field"><label>Gravida</label><input name="gravida" type="number" min="0"></div><div class="field"><label>Para</label><input name="para" type="number" min="0"></div><div class="field"><label>Previous abortions</label><input name="abortion_count" type="number" min="0"></div><div class="field"><label>Living children</label><input name="living_children" type="number" min="0"></div><div class="field"><label>Risk level</label><select name="risk_level"><option value="not_assessed">Not assessed</option><option value="low">Low</option><option value="high">High</option></select></div><div class="field full"><label>Clinical notes</label><textarea name="notes"></textarea></div></div><button class="btn" style="margin-top:12px">Save pregnancy</button><div id="pregnancyMsg"></div></form></div><div class="panel" style="margin-top:14px"><h2>Pregnancy register</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>LMP</th><th>EDD</th><th>Gestational age*</th><th>Risk</th></tr></thead><tbody id="pregnancyRows"></tbody></table></div><p class="small muted">*Gestational age is a date-based estimate from LMP, not a clinical assessment. Confirm dates clinically.</p></div><div class="panel" style="margin-top:14px"><h2>Record ANC visit</h2><form id="ancForm"><div class="fields"><div class="field"><label>Pregnancy *</label><select name="pregnancy_id" id="ancPregnancy" required></select></div><div class="field"><label>Visit date</label><input name="visit_date" type="datetime-local"></div><div class="field"><label>Blood pressure (systolic)</label><input name="bp_systolic" type="number"></div><div class="field"><label>Blood pressure (diastolic)</label><input name="bp_diastolic" type="number"></div><div class="field"><label>Weight (kg)</label><input name="weight_kg" type="number" step=".1"></div><div class="field"><label>Fetal heart rate (bpm)</label><input name="fetal_heart_rate" type="number"></div><div class="field full"><label>Symptoms / assessment / plan</label><textarea name="symptoms" placeholder="Symptoms"></textarea><textarea name="assessment" placeholder="Clinician assessment" style="margin-top:8px"></textarea><textarea name="plan" placeholder="Plan / next steps" style="margin-top:8px"></textarea></div><div class="field"><label>Next visit date</label><input name="next_visit_date" type="date"></div></div><button class="btn" style="margin-top:12px">Save ANC visit</button><div id="ancMsg"></div></form></div></section>
 <section id="highrisk" class="section">
 <div class="panel"><div class="row between"><h2>High-risk pregnancy monitoring</h2><button class="btn secondary" type="button" onclick="window.print()">Print / Save PDF</button></div><p class="small muted">Monitoring workspace only. Flags below are extracted from recorded history and reports; they are not an automated diagnosis or validated risk score. The treating obstetrician must confirm all assessments.</p><div id="highRiskCards" class="grid"></div></div>
+<div class="panel"><h2>Clinical intelligence & safety review</h2><p class="small muted">Decision-support flags are generated only from saved text and structured records. They are prompts for clinician verification, not diagnoses, validated risk scores, prescribing advice or automatic changes.</p><div class="fields"><div class="field"><h3>Pregnancy history checklist</h3><div id="clinicalRiskFlags" class="small muted">Loading…</div></div><div class="field"><h3>Medication record completeness</h3><div id="medicationSafetyFlags" class="small muted">Loading…</div></div></div><h3>Investigation reference-range review</h3><div id="investigationSafetyFlags" class="small muted">Loading…</div></div>
 <div class="panel"><h2>Maternal observations</h2><div class="tablewrap"><table><thead><tr><th>Visit date</th><th>Patient</th><th>BP</th><th>Pulse</th><th>Weight</th><th>Assessment / plan</th></tr></thead><tbody id="highRiskVitalsRows"></tbody></table></div></div>
 <div class="panel"><h2>Previous LSCS scar / ultrasound timeline</h2><div class="tablewrap"><table><thead><tr><th>Scan date</th><th>Patient</th><th>Recorded findings</th><th>Review status</th></tr></thead><tbody id="highRiskScanRows"></tbody></table></div><p class="small muted">Measurements from different scans should not be interpreted as progression without review of the original images, measurement plane and technique.</p></div>
 <div class="panel"><h2>Maternal trend charts</h2><p class="small muted">Recorded values only; missing readings are not interpolated.</p><div class="fields"><div class="field"><h3>Blood pressure (mmHg)</h3><div id="highRiskBpChart" class="tablewrap"></div></div><div class="field"><h3>Weight (kg)</h3><div id="highRiskWeightChart" class="tablewrap"></div></div></div></div>
@@ -232,9 +233,64 @@ function render(){
  if($('ancPregnancy'))$('ancPregnancy').innerHTML=pregnancyOptions;
  fillPatientSelects();
  renderHighRiskMonitoring();
+ renderClinicalSafetyFlags();
  fillHighRiskReviewSelects();
  renderHighRiskExtras();
  setClinicLanguage(localStorage.getItem('gyn_language')||'en');
+}
+function renderClinicalSafetyFlags(){
+ const byId=new Map(patients.map(p=>[p.id,p]));
+ const risk=$('clinicalRiskFlags'),med=$('medicationSafetyFlags'),inv=$('investigationSafetyFlags');
+ const riskRows=[];
+ pregnancies.forEach(g=>{
+  const p=byId.get(g.patient_id);if(!p)return;
+  const text=[p.medical_history,p.notes,g.notes].filter(Boolean).join(' ').toLowerCase();
+  const factors=[];
+  if(/previous.{0,30}(lscs|caesarean|cesarean)|old.{0,15}(lscs|scar)|isthmocele/.test(text))factors.push('Previous caesarean / scar history recorded — verify source records and current obstetric plan');
+  if(/hypertension|high blood pressure|amlodipine/.test(text))factors.push('Hypertension history or medicine mentioned — confirm current diagnosis, readings and treatment with clinician');
+  if(/diabetes|gestational diabetes/.test(text))factors.push('Diabetes history mentioned — verify diagnosis and screening status');
+  if(/thyroid|hypothyroid|hyperthyroid/.test(text))factors.push('Thyroid history mentioned — verify diagnosis and monitoring');
+  if(!g.risk_level||String(g.risk_level).toLowerCase()==='not_assessed')factors.push('Pregnancy risk level is marked not assessed');
+  if(factors.length)riskRows.push('<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>'+esc(p.full_name)+'</b><ul>'+factors.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>');
+ });
+ if(risk)risk.innerHTML=riskRows.length?riskRows.join(''):'No checklist prompts detected in recorded pregnancy history. This does not establish low risk.';
+ const medRows=[];
+ (prescriptions||[]).forEach(r=>{
+  const p=byId.get(r.patient_id),allergy=String(p?.allergies||'').trim();
+  const items=Array.isArray(r.medicines)?r.medicines:[];
+  const issues=[];
+  if(!items.length)issues.push('No structured medicine items found; verify prescription attachment/text');
+  items.forEach((m,i)=>{
+   if(typeof m==='string'){if(!m.trim())issues.push('Medicine '+(i+1)+' has an empty name');return}
+   if(!m||typeof m!=='object'){issues.push('Medicine '+(i+1)+' has an unstructured entry');return}
+   if(!m.name)issues.push('Medicine '+(i+1)+': name missing');
+   if(!m.dose)issues.push((m.name||'Medicine '+(i+1))+': dose not recorded');
+   if(!m.frequency)issues.push((m.name||'Medicine '+(i+1))+': frequency not recorded');
+  });
+  if(allergy)issues.push('Patient allergy field contains information — clinician/pharmacist should reconcile against each medicine');
+  if(issues.length)medRows.push('<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>'+esc(p?.full_name||'Patient')+' · '+esc(dateOnly(String(r.prescribed_at||'').slice(0,10)))+'</b><ul>'+issues.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>');
+ });
+ if(med)med.innerHTML=medRows.length?medRows.join(''):'No missing structured medicine fields detected in the loaded prescription records. This is not a medication safety clearance.';
+ const invRows=[];
+ (investigations||[]).forEach(r=>{
+  const data=r.result_data&&typeof r.result_data==='object'?r.result_data:{};
+  const checks=[];
+  const visit=(obj,path)=>{
+   if(!obj||typeof obj!=='object')return;
+   if(Array.isArray(obj)){obj.forEach((v,i)=>visit(v,path+' '+(i+1)));return}
+   const value=Number(obj.value??obj.result);
+   const low=Number(obj.reference_low??obj.ref_low??obj.normal_min);
+   const high=Number(obj.reference_high??obj.ref_high??obj.normal_max);
+   if(Number.isFinite(value)&&(Number.isFinite(low)||Number.isFinite(high))){
+    if(Number.isFinite(low)&&value<low)checks.push(path+': '+value+' below recorded reference '+low);
+    if(Number.isFinite(high)&&value>high)checks.push(path+': '+value+' above recorded reference '+high);
+   }
+   Object.entries(obj).forEach(([k,v])=>{if(v&&typeof v==='object')visit(v,path==='result'?k:path+'.'+k)});
+  };
+  visit(data,'result');
+  if(checks.length)invRows.push('<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>'+esc(byId.get(r.patient_id)?.full_name||'Patient')+' · '+esc(r.investigation_type||'Investigation')+'</b><ul>'+checks.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><span class="small muted">Compared only with reference limits stored in this record; verify units, source range and clinical significance.</span></div>');
+ });
+ if(inv)inv.innerHTML=invRows.length?invRows.join(''):'No numeric results with stored reference limits were available to compare. No external reference ranges or abnormality assumptions were applied.';
 }
 function renderHighRiskMonitoring(){
  const card=$('highRiskCards');if(!card)return;
@@ -584,6 +640,14 @@ bindSimpleModuleForm('inventoryForm','gyn_inventory_items',['reorder_level','pur
 
 function printPatientSummary(p){
  const rows=[['Patient ID',p.patient_code],['Name',p.full_name],['Date of birth',p.date_of_birth||'—'],['Phone',p.phone||'—'],['Email',p.email||'—'],['Blood group',p.blood_group||'—'],['Address',p.address||'—'],['Allergies',p.allergies||'—'],['Medical history',p.medical_history||'—'],['Notes',p.notes||'—']];
+ const patientAppointments=appointments.filter(x=>x.patient_id===p.id).map(x=>['Appointment',isoLocal(x.appointment_at)+' · '+(x.appointment_type||x.status||'')]);
+ const patientAnc=ancVisits.filter(x=>x.patient_id===p.id).map(x=>['ANC visit',isoLocal(x.visit_date)+' · BP '+(x.bp_systolic&&x.bp_diastolic?x.bp_systolic+'/'+x.bp_diastolic:'—')+' · weight '+(x.weight_kg??'—')+' kg · '+(x.assessment||x.plan||'')]);
+ const patientScans=ultrasounds.filter(x=>x.patient_id===p.id).map(x=>['Ultrasound',isoLocal(x.scan_date)+' · '+(x.scan_type||'')+' · '+(x.impression||JSON.stringify(x.findings||{}))]);
+ const patientLabs=investigations.filter(x=>x.patient_id===p.id).map(x=>['Investigation',(x.result_date||'')+' · '+(x.investigation_type||'')+' · '+(x.result_summary||JSON.stringify(x.result_data||{}))]);
+ const patientRx=prescriptions.filter(x=>x.patient_id===p.id).map(x=>['Prescription',isoLocal(x.prescribed_at)+' · '+JSON.stringify(x.medicines||[])+' · '+(x.advice||'')]);
+ const patientReviews=highRiskReviews.filter(x=>x.patient_id===p.id).map(x=>['Clinician assessment',(x.review_date||'')+' · '+(x.clinician_assessment||'')+' · '+(x.plan_and_follow_up||'')]);
+ const timeline=[...patientAppointments,...patientAnc,...patientScans,...patientLabs,...patientRx,...patientReviews].sort((a,b)=>String(b[1]).localeCompare(String(a[1])));
+ rows.push(...timeline.map(([kind,detail])=>[kind,detail]));
  const doc='<!doctype html><html><head><meta charset="utf-8"><title>Patient summary</title><style>body{font:14px Arial,sans-serif;padding:28px;color:#173b37}h1{font-size:20px}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:9px;vertical-align:top}td:first-child{font-weight:bold;width:28%;background:#f3f7f5}.muted{color:#667b77;font-size:12px}@media print{button{display:none}}</style></head><body><h1>'+esc(clinic.clinic_name)+' · Patient summary</h1><p class="muted">Printed '+esc(new Date().toLocaleString('en-IN'))+' · Confidential</p><table>'+rows.map(row=>'<tr><td>'+esc(row[0])+'</td><td>'+esc(row[1])+'</td></tr>').join('')+'</table><p class="muted">This is a patient demographic summary, not a clinical diagnosis or treatment document.</p><button onclick="window.print()">Print / Save as PDF</button></body></html>';
  const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the patient summary.');return}w.document.open();w.document.write(doc);w.document.close();w.focus();
 }
