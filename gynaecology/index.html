@@ -9,7 +9,7 @@
 <section id="loginPanel" class="panel login"><h2>Secure clinic login</h2><p class="muted">Sign in with your registered clinic account.</p><form id="loginForm"><div style="margin:12px 0"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div style="margin:12px 0"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><button class="btn" style="width:100%">Sign in</button></form><div id="loginMsg" aria-live="polite"></div><p class="small muted">Access is controlled by Supabase authentication and clinic membership. No public patient registration.</p></section>
 <section id="app" class="hidden">
 <div class="row between"><div><strong id="clinicName">Clinic</strong><div class="muted small" id="roleLabel"></div></div><span class="pill">Cloud database connected</span></div>
-<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button><button data-tab="operations">Clinic operations</button></div>
+<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button><button data-tab="operations">Clinic operations</button><button data-tab="reports">Reports & documents</button></div>
 <section id="dashboard" class="section active"><div class="grid"><div class="card"><div class="muted">Patients</div><div class="stat" id="statPatients">—</div></div><div class="card"><div class="muted">Appointments</div><div class="stat" id="statAppointments">—</div></div><div class="card"><div class="muted">Ongoing pregnancies</div><div class="stat" id="statPregnancies">—</div></div></div><div class="panel" style="margin-top:15px"><h2>Today's appointments</h2><div id="todayList" class="muted">Loading…</div></div></section>
 <section id="patients" class="section"><div class="panel"><div class="row between"><h2>Patient register</h2><button class="btn" id="newPatient">+ Add patient</button></div><input id="patientSearch" placeholder="Search patient name, ID or phone" style="margin:8px 0 14px"><div class="tablewrap"><table><thead><tr><th>Patient ID</th><th>Name</th><th>Phone</th><th>Blood group</th><th>Action</th></tr></thead><tbody id="patientRows"></tbody></table></div></div>
 <div id="patientFormPanel" class="panel hidden" style="margin-top:14px"><h2 id="patientFormTitle">Register patient</h2><form id="patientForm"><div class="fields"><div class="field"><label>Patient ID *</label><input name="patient_code" required placeholder="e.g. GYN-0001"></div><div class="field"><label>Full name *</label><input name="full_name" required></div><div class="field"><label>Date of birth</label><input name="date_of_birth" type="date"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Blood group</label><select name="blood_group"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div><div class="field full"><label>Address</label><textarea name="address"></textarea></div><div class="field"><label>Allergies</label><textarea name="allergies"></textarea></div><div class="field"><label>Medical history</label><textarea name="medical_history"></textarea></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div></div><div class="row" style="margin-top:14px"><button class="btn">Save patient</button><button type="button" class="btn secondary" id="cancelPatient">Cancel</button></div><div id="patientMsg"></div></form></div></section>
@@ -130,6 +130,22 @@
 <div class="panel" style="margin-top:14px"><h2>Stock register</h2><div class="tablewrap"><table><thead><tr><th>Item</th><th>Batch</th><th>Expiry</th><th>Quantity</th><th>Reorder level</th></tr></thead><tbody id="inventoryRows"></tbody></table></div></div>
 </section>
 
+
+<section id="reports" class="section">
+<div class="panel"><h2>Secure patient document upload</h2><form id="attachmentForm"><div class="fields">
+<div class="field"><label>Patient *</label><select name="patient_id" id="attachmentPatient" required></select></div>
+<div class="field"><label>Document type</label><select name="entity_type"><option value="patient">Patient document</option><option value="pregnancy">Pregnancy</option><option value="anc_visit">ANC visit</option><option value="investigation">Investigation</option><option value="ultrasound">Ultrasound report</option><option value="delivery">Delivery</option><option value="consent">Consent</option><option value="fertility">Fertility</option></select></div>
+<div class="field full"><label>Choose PDF or image (max 10 MB) *</label><input id="attachmentFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required></div>
+</div><button class="btn" style="margin-top:12px">Upload private document</button><div id="attachmentMsg"></div></form><p class="small muted">Files are stored in a private Supabase bucket. Only authorised clinic owner, doctor and nurse accounts can access them.</p></div>
+<div class="panel" style="margin-top:14px"><h2>Patient documents</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
+<div class="panel" style="margin-top:14px"><h2>Clinic reports</h2><p class="muted">Export files contain confidential health or billing information. Save them only on an encrypted, access-controlled device.</p><div class="row">
+<button class="btn secondary" id="exportPatientsCsv">Export patient register CSV</button>
+<button class="btn secondary" id="exportAppointmentsCsv">Export appointments CSV</button>
+<button class="btn secondary" id="exportBillingCsv">Export billing CSV</button>
+</div></div>
+<div class="panel" style="margin-top:14px"><h2>Patient summary print</h2><p class="muted">Use the Print button beside a patient in the Patients register to print a basic patient summary or save it as PDF.</p></div>
+</section>
+
 <p class="small muted" style="margin:18px 2px">Clinical record software only. It does not diagnose, prescribe, calculate clinical risk, or replace clinician judgement. Use only after completing privacy, access-control and workflow testing.</p>
 </section></main>
 <script>
@@ -148,7 +164,7 @@ function ageWeeks(lmp){if(!lmp)return '—';const days=Math.floor((Date.now()-ne
 async function loadClinic(){const {data,error}=await db.from('gyn_memberships').select('clinic_id,role,is_active,gyn_clinics(id,clinic_name,timezone)').eq('user_id',user.id).eq('is_active',true);if(error)throw error;const m=(data||[]).find(x=>x.gyn_clinics);if(!m)throw new Error('No active clinic membership is assigned to this account. Ask the clinic owner.');clinic=m.gyn_clinics;role=m.role;$('clinicName').textContent=clinic.clinic_name;$('roleLabel').textContent='Signed in as '+role+' · '+user.email}
 async function loadAll(){const [p,a,g]=await Promise.all([db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false}),db.from('gyn_appointments').select('*').eq('clinic_id',clinic.id).order('appointment_at',{ascending:false}).limit(150),db.from('gyn_pregnancies').select('*').eq('clinic_id',clinic.id).eq('status','ongoing').order('created_at',{ascending:false})]);for(const r of [p,a,g])if(r.error)throw r.error;patients=p.data||[];appointments=a.data||[];pregnancies=g.data||[];render()}
 function render(){const pmap=Object.fromEntries(patients.map(p=>[p.id,p]));$('statPatients').textContent=patients.length;$('statAppointments').textContent=appointments.length;$('statPregnancies').textContent=pregnancies.length;
-$('patientRows').innerHTML=patients.map(p=>'<tr><td>'+esc(p.patient_code)+'</td><td>'+esc(p.full_name)+'</td><td>'+esc(p.phone||'—')+'</td><td>'+esc(p.blood_group||'—')+'</td><td><button class="btn secondary" data-edit="'+p.id+'">Edit</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No patients registered.</td></tr>';
+$('patientRows').innerHTML=patients.map(p=>'<tr><td>'+esc(p.patient_code)+'</td><td>'+esc(p.full_name)+'</td><td>'+esc(p.phone||'—')+'</td><td>'+esc(p.blood_group||'—')+'</td><td><button class="btn secondary" data-edit="'+p.id+'">Edit</button> <button class="btn secondary" data-print="'+p.id+'">Print</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No patients registered.</td></tr>';
 $('appointmentPatient').innerHTML='<option value="">Select patient</option>'+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('');
 $('pregPatient').innerHTML=$('appointmentPatient').innerHTML;
 $('appointmentRows').innerHTML=appointments.map(a=>'<tr><td>'+esc(isoLocal(a.appointment_at))+'</td><td>'+esc(pmap[a.patient_id]?.full_name||'Patient')+'</td><td>'+esc(a.appointment_type)+'</td><td>'+esc(a.status)+'</td><td>'+(a.status==='scheduled'?'<button class="btn secondary" data-done="'+a.id+'">Mark done</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">No appointments yet.</td></tr>';
@@ -163,7 +179,7 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.query
 $('newPatient').onclick=()=>{editingPatient=null;$('patientForm').reset();$('patientFormTitle').textContent='Register patient';$('patientFormPanel').classList.remove('hidden');$('patientMsg').innerHTML='';$('patientFormPanel').scrollIntoView({behavior:'smooth'})};
 $('cancelPatient').onclick=()=>$('patientFormPanel').classList.add('hidden');
 $('patientForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;const payload=formObj(f);payload.clinic_id=clinic.id;payload.emergency_contact={};if(!payload.date_of_birth)delete payload.date_of_birth;for(const k of ['phone','email','address','blood_group','allergies','medical_history','notes'])if(!payload[k])payload[k]=null;const q=editingPatient?db.from('gyn_patients').update(payload).eq('id',editingPatient).eq('clinic_id',clinic.id):db.from('gyn_patients').insert(payload);const {error}=await q;if(error){msg('patientMsg',error.message,true);return}msg('patientMsg','Patient saved.');$('patientFormPanel').classList.add('hidden');await loadAll()};
-$('patientRows').onclick=async e=>{const id=e.target.dataset.edit;if(!id)return;const p=patients.find(x=>x.id===id);if(!p)return;editingPatient=id;$('patientForm').reset();for(const [k,v] of Object.entries(p))if($('patientForm').elements[k])$('patientForm').elements[k].value=v??'';$('patientFormTitle').textContent='Edit patient · '+p.patient_code;$('patientFormPanel').classList.remove('hidden');$('patientFormPanel').scrollIntoView({behavior:'smooth'})};
+$('patientRows').onclick=async e=>{const printId=e.target.dataset.print;if(printId){const patient=patients.find(x=>x.id===printId);if(patient)printPatientSummary(patient);return}const id=e.target.dataset.edit;if(!id)return;const p=patients.find(x=>x.id===id);if(!p)return;editingPatient=id;$('patientForm').reset();for(const [k,v] of Object.entries(p))if($('patientForm').elements[k])$('patientForm').elements[k].value=v??'';$('patientFormTitle').textContent='Edit patient · '+p.patient_code;$('patientFormPanel').classList.remove('hidden');$('patientFormPanel').scrollIntoView({behavior:'smooth'})};
 $('patientSearch').oninput=e=>{const term=e.target.value.toLowerCase();document.querySelectorAll('#patientRows tr').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(term)?'':'none')};
 $('appointmentForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;const p=formObj(f);p.clinic_id=clinic.id;p.appointment_at=new Date(p.appointment_at).toISOString();p.fee=p.fee?Number(p.fee):null;p.reason=p.reason||null;const {error}=await db.from('gyn_appointments').insert(p);if(error){msg('appointmentMsg',error.message,true);return}f.reset();msg('appointmentMsg','Appointment saved.');await loadAll()};
 $('appointmentRows').onclick=async e=>{const id=e.target.dataset.done;if(!id)return;if(!confirm('Mark this appointment as completed?'))return;const {error}=await db.from('gyn_appointments').update({status:'completed'}).eq('id',id).eq('clinic_id',clinic.id);if(error){alert(error.message);return}await loadAll()};
@@ -313,7 +329,7 @@ render=function(){renderOriginal();setClinicLanguage(localStorage.getItem('gyn_l
 
 
 let moduleData={};
-const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing'];
+const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing'];
 async function loadModuleLists(){
  const results=await Promise.all(MODULE_TABLES.map(t=>db.from(t).select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)));
  results.forEach((r,i)=>{if(r.error)throw r.error;moduleData[MODULE_TABLES[i]]=r.data||[]});
@@ -330,6 +346,7 @@ function fillModuleSelects(){
  if($('fertilityCase'))$('fertilityCase').innerHTML='<option value="">Select case</option>'+cases;
  const patientSelect=(id,none)=>{const el=$(id);if(el)el.innerHTML=(none?'<option value="">'+none+'</option>':'<option value="">Select patient</option>')+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('')};
  ['paymentPatient','reminderPatient'].forEach(id=>patientSelect(id,'Select patient'));
+ patientSelect('attachmentPatient','Select patient');
  patientSelect('waitlistPatient','Select patient');
  const invoices=moduleData.gyn_billing||[];
  if($('paymentInvoice'))$('paymentInvoice').innerHTML='<option value="">Select invoice</option>'+invoices.map(i=>'<option value="'+i.id+'">'+esc(i.invoice_number+' · ₹'+i.total+' · due ₹'+Math.max(0,Number(i.total)-Number(i.paid_amount||0)).toFixed(2))+'</option>').join('');
@@ -360,6 +377,8 @@ function renderModuleLists(){
  tableRows('waitlistRows',moduleData.gyn_waitlist||[],[r=>pname(r.patient_id),r=>isoLocal(r.preferred_at),r=>r.priority,r=>r.status,r=>r.reason||'—']);
  tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[r=>r.medicine_name,r=>r.generic_name||'—',r=>r.strength||'—',r=>r.dosage_form||'—',r=>r.unit_price==null?'—':'₹'+Number(r.unit_price).toFixed(2)]);
  tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[r=>r.item_name,r=>r.batch_number||'—',r=>dateOnly(r.expiry_date),r=>r.quantity,r=>r.reorder_level]);
+ tableRows('attachmentRows',moduleData.gyn_attachments||[],[r=>pname(r.patient_id),r=>r.original_filename,r=>r.entity_type,r=>isoLocal(r.created_at),r=>'<button class="btn secondary" data-attachment="'+r.id+'">Open</button>']);
+
 
 }
 const loadAllBeforeModules=loadAll;
@@ -410,6 +429,43 @@ bindSimpleModuleForm('reminderForm','gyn_reminders',[],['due_at']);
 bindSimpleModuleForm('waitlistForm','gyn_waitlist',[],['preferred_at']);
 bindSimpleModuleForm('medicineForm','gyn_medicine_catalog',['unit_price']);
 bindSimpleModuleForm('inventoryForm','gyn_inventory_items',['reorder_level','purchase_price','selling_price']);
+
+function printPatientSummary(p){
+ const rows=[['Patient ID',p.patient_code],['Name',p.full_name],['Date of birth',p.date_of_birth||'—'],['Phone',p.phone||'—'],['Email',p.email||'—'],['Blood group',p.blood_group||'—'],['Address',p.address||'—'],['Allergies',p.allergies||'—'],['Medical history',p.medical_history||'—'],['Notes',p.notes||'—']];
+ const doc='<!doctype html><html><head><meta charset="utf-8"><title>Patient summary</title><style>body{font:14px Arial,sans-serif;padding:28px;color:#173b37}h1{font-size:20px}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:9px;vertical-align:top}td:first-child{font-weight:bold;width:28%;background:#f3f7f5}.muted{color:#667b77;font-size:12px}@media print{button{display:none}}</style></head><body><h1>'+esc(clinic.clinic_name)+' · Patient summary</h1><p class="muted">Printed '+esc(new Date().toLocaleString('en-IN'))+' · Confidential</p><table>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('')+'</table><p class="muted">This is a patient demographic summary, not a clinical diagnosis or treatment document.</p><button onclick="window.print()">Print / Save as PDF</button></body></html>';
+ const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the patient summary.');return}w.document.open();w.document.write(doc);w.document.close();w.focus();
+}
+function downloadCsv(filename,rows){
+ if(!rows.length){alert('No records available to export.');return}
+ const keys=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+ const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const csv=[keys.map(quote).join(','),...rows.map(r=>keys.map(k=>quote(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])).join(','))].join('\r\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+$('exportPatientsCsv').onclick=()=>{if(!['owner','doctor'].includes(role)){alert('Only owner or doctor can export patient data.');return}if(confirm('Export confidential patient information to CSV?'))downloadCsv('clinic-patients.csv',patients)};
+$('exportAppointmentsCsv').onclick=()=>{if(confirm('Export confidential appointment information to CSV?'))downloadCsv('clinic-appointments.csv',appointments)};
+$('exportBillingCsv').onclick=()=>{if(!['owner','doctor','billing_staff'].includes(role)){alert('Your role cannot export billing data.');return}if(confirm('Export confidential billing information to CSV?'))downloadCsv('clinic-billing.csv',moduleData.gyn_billing||[])};
+$('attachmentForm').addEventListener('submit',async e=>{
+ e.preventDefault();const patientId=$('attachmentPatient').value,file=$('attachmentFile').files[0],entityType=e.currentTarget.elements.entity_type.value;
+ if(!file){msg('attachmentMsg','Choose a file first.',true);return}
+ if(file.size>10485760){msg('attachmentMsg','File exceeds the 10 MB limit.',true);return}
+ if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type)){msg('attachmentMsg','Only PDF, JPG, PNG and WEBP files are allowed.',true);return}
+ const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+ const path=clinic.id+'/'+patientId+'/'+crypto.randomUUID()+'_'+safeName;
+ const {error:uploadError}=await db.storage.from('gyn-private').upload(path,file,{contentType:file.type,upsert:false});
+ if(uploadError){msg('attachmentMsg',uploadError.message,true);return}
+ const {error:rowError}=await db.from('gyn_attachments').insert({clinic_id:clinic.id,patient_id:patientId,entity_type:entityType,storage_bucket:'gyn-private',storage_path:path,original_filename:file.name,mime_type:file.type,size_bytes:file.size,uploaded_by:user.id});
+ if(rowError){await db.storage.from('gyn-private').remove([path]);msg('attachmentMsg',rowError.message,true);return}
+ await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_uploaded',entity_type:'gyn_attachments',details:{patient_id:patientId,mime_type:file.type,size_bytes:file.size}});
+ e.currentTarget.reset();msg('attachmentMsg','Private document uploaded.');await loadModuleLists();
+});
+$('attachmentRows').addEventListener('click',async e=>{
+ const id=e.target.dataset.attachment;if(!id)return;
+ const item=(moduleData.gyn_attachments||[]).find(x=>x.id===id);if(!item)return;
+ const {data,error}=await db.storage.from(item.storage_bucket).createSignedUrl(item.storage_path,60);
+ if(error){alert(error.message);return}window.open(data.signedUrl,'_blank','noopener');
+});
+
 $('paymentInvoice').addEventListener('change',()=>{
  const inv=(moduleData.gyn_billing||[]).find(x=>x.id===$('paymentInvoice').value);
  if(inv)$('paymentPatient').value=inv.patient_id;
