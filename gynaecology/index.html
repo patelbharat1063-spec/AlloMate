@@ -143,7 +143,7 @@
 <button class="btn secondary" id="exportAppointmentsCsv">Export appointments CSV</button>
 <button class="btn secondary" id="exportBillingCsv">Export billing CSV</button>
 </div></div>
-<div class="panel" style="margin-top:14px"><h2>Patient summary print</h2><p class="muted">Use the Print button beside a patient in the Patients register to print a basic patient summary or save it as PDF.</p></div>
+<div class="panel" style="margin-top:14px"><h2>Restore clinic backup</h2><div class="fields"><div class="field full"><label>Choose a clinic JSON backup</label><input id="restoreFile" type="file" accept="application/json,.json"></div></div><button class="btn danger" id="restoreBtn" type="button">Restore missing records only</button><div id="restoreMsg"></div><p class="small muted">Owner only. Restore is append-only: existing record IDs are skipped and existing data is never overwritten. This restore does not import clinic identity, staff memberships, audit history, or attachment file contents. Use a backup from this same clinic.</p></div><div class="panel" style="margin-top:14px"><h2>Patient summary print</h2><p class="muted">Use the Print button beside a patient in the Patients register to print a basic patient summary or save it as PDF.</p></div>
 </section>
 
 <p class="small muted" style="margin:18px 2px">Clinical record software only. It does not diagnose, prescribe, calculate clinical risk, or replace clinician judgement. Use only after completing privacy, access-control and workflow testing.</p>
@@ -463,6 +463,21 @@ $('attachmentForm').addEventListener('submit',async e=>{
  if(rowError){await db.storage.from('gyn-private').remove([path]);msg('attachmentMsg',rowError.message,true);return}
  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_uploaded',entity_type:'gyn_attachments',details:{patient_id:patientId,mime_type:file.type,size_bytes:file.size}});
  e.currentTarget.reset();msg('attachmentMsg','Private document uploaded.');await loadModuleLists();
+});
+
+$('restoreBtn').addEventListener('click',async()=>{
+ if(role!=='owner'){msg('restoreMsg','Only the clinic owner can restore backups.',true);return}
+ const file=$('restoreFile').files[0];if(!file){msg('restoreMsg','Choose a JSON backup file first.',true);return}
+ let backup;try{backup=JSON.parse(await file.text())}catch(e){msg('restoreMsg','The selected file is not valid JSON.',true);return}
+ if(backup.format_version!==1||!backup.data||backup.clinic_id!==clinic.id){msg('restoreMsg','This backup format or clinic ID does not match the signed-in clinic.',true);return}
+ if(!confirm('Restore missing records from this backup? Existing rows will not be overwritten. This action may add many records. Continue?'))return;
+ const btn=$('restoreBtn');btn.disabled=true;msg('restoreMsg','Validating and restoring records…');
+ const {data,error}=await db.rpc('gyn_restore_backup_append_only',{p_clinic_id:clinic.id,p_backup:backup});
+ btn.disabled=false;
+ if(error){msg('restoreMsg','Restore failed: '+error.message,true);return}
+ const total=Object.values(data||{}).reduce((a,b)=>a+Number(b||0),0);
+ msg('restoreMsg','Restore completed. '+total+' new records imported; existing IDs were skipped.');
+ await loadAll();
 });
 $('attachmentRows').addEventListener('click',async e=>{
  const id=e.target.dataset.attachment;if(!id)return;
