@@ -377,7 +377,7 @@ function renderModuleLists(){
  tableRows('waitlistRows',moduleData.gyn_waitlist||[],[r=>pname(r.patient_id),r=>isoLocal(r.preferred_at),r=>r.priority,r=>r.status,r=>r.reason||'—']);
  tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[r=>r.medicine_name,r=>r.generic_name||'—',r=>r.strength||'—',r=>r.dosage_form||'—',r=>r.unit_price==null?'—':'₹'+Number(r.unit_price).toFixed(2)]);
  tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[r=>r.item_name,r=>r.batch_number||'—',r=>dateOnly(r.expiry_date),r=>r.quantity,r=>r.reorder_level]);
- tableRows('attachmentRows',moduleData.gyn_attachments||[],[r=>pname(r.patient_id),r=>r.original_filename,r=>r.entity_type,r=>isoLocal(r.created_at),r=>'<button class="btn secondary" data-attachment="'+r.id+'">Open</button>']);
+ const attachmentBody=$('attachmentRows');if(attachmentBody){const docs=moduleData.gyn_attachments||[];attachmentBody.innerHTML=docs.length?docs.map(r=>'<tr><td>'+esc(pname(r.patient_id))+'</td><td>'+esc(r.original_filename)+'</td><td>'+esc(r.entity_type)+'</td><td>'+esc(isoLocal(r.created_at))+'</td><td><button class="btn secondary" data-attachment="'+r.id+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>'}
 
 
 }
