@@ -124,7 +124,7 @@
 </div><button class="btn" style="margin-top:12px">Create stock item</button><div id="inventoryMsg"></div></form></div>
 <div class="panel" style="margin-top:14px"><h2>Stock movement</h2><form id="movementForm"><div class="fields">
 <div class="field"><label>Stock item *</label><select name="item_id" id="movementItem" required></select></div><div class="field"><label>Movement type</label><select name="movement_type"><option value="purchase">Purchase / add stock</option><option value="return">Return / add stock</option><option value="dispense">Dispense / reduce stock</option><option value="wastage">Wastage / reduce stock</option><option value="adjustment">Adjustment</option></select></div>
-<div class="field"><label>Quantity *</label><input name="quantity" type="number" min=".001" step=".001" required></div><div class="field"><label>Unit cost (₹)</label><input name="unit_cost" type="number" min="0" step=".01"></div>
+<div class="field"><label>Quantity *</label><input name="quantity" type="number" min="-999999" step=".001" required></div><div class="field"><label>Unit cost (₹)</label><input name="unit_cost" type="number" min="0" step=".01"></div>
 <div class="field"><label>Reference</label><input name="reference_text"></div><div class="field"><label>Notes</label><input name="notes"></div>
 </div><button class="btn" style="margin-top:12px">Post stock movement</button><div id="movementMsg"></div></form><p class="small muted">Dispense and wastage reduce stock. Negative stock is blocked. Confirm quantities against physical stock.</p></div>
 <div class="panel" style="margin-top:14px"><h2>Stock register</h2><div class="tablewrap"><table><thead><tr><th>Item</th><th>Batch</th><th>Expiry</th><th>Quantity</th><th>Reorder level</th></tr></thead><tbody id="inventoryRows"></tbody></table></div></div>
@@ -240,7 +240,25 @@ const I18N_GU={
 'Feeding method':'ખોરાક આપવાની રીત','Contraception counselling':'ગર્ભનિરોધક સલાહ','Plan':'યોજના','Save postnatal visit':'પ્રસૂતિ પછીની મુલાકાત સાચવો',
 'Postnatal visit history':'પ્રસૂતિ પછીની મુલાકાતનો ઇતિહાસ','Patient consent register':'દર્દીની સંમતિ રજિસ્ટર','Consent type *':'સંમતિનો પ્રકાર *',
 'Document version':'દસ્તાવેજ આવૃત્તિ','Draft':'મસદ્દો','Signed':'સહી કરેલ','Withdrawn':'પાછી ખેંચેલી','Superseded':'બદલાયેલ',
-'Signed date/time':'સહી તારીખ/સમય','Witness name':'સાક્ષીનું નામ','Save consent record':'સંમતિ રેકોર્ડ સાચવો','Consent history':'સંમતિનો ઇતિહાસ' 
+'Signed date/time':'સહી તારીખ/સમય','Witness name':'સાક્ષીનું નામ','Save consent record':'સંમતિ રેકોર્ડ સાચવો','Consent history':'સંમતિનો ઇતિહાસ',
+'Clinic operations':'ક્લિનિક કામગીરી','Record payment against invoice':'ઇન્વૉઇસ સામે ચુકવણી નોંધો','Invoice *':'ઇન્વૉઇસ *',
+'Payment amount (₹) *':'ચુકવણી રકમ (₹) *','Payment method':'ચુકવણી પદ્ધતિ','Reference number':'સંદર્ભ નંબર','Record payment':'ચુકવણી નોંધો',
+'Payment history':'ચુકવણી ઇતિહાસ','Amount':'રકમ','Clinic expenses':'ક્લિનિક ખર્ચ','Date':'તારીખ','Category *':'શ્રેણી *','Category':'શ્રેણી',
+'Description *':'વર્ણન *','Amount (₹) *':'રકમ (₹) *','Vendor':'વિક્રેતા','Save expense':'ખર્ચ સાચવો','Expense register':'ખર્ચ રજિસ્ટર',
+'Patient reminders / follow-up queue':'દર્દી રિમાઇન્ડર / ફોલો-અપ યાદી','Reminder type *':'રિમાઇન્ડર પ્રકાર *','Due date/time *':'નિયત તારીખ/સમય *',
+'Channel':'માધ્યમ','Internal task':'આંતરિક કાર્ય','WhatsApp-ready':'WhatsApp માટે તૈયાર','Email-ready':'ઇમેઇલ માટે તૈયાર','SMS-ready':'SMS માટે તૈયાર',
+'Message / staff note':'સંદેશ / સ્ટાફ નોંધ','Create reminder':'રિમાઇન્ડર બનાવો','Reminder queue':'રિમાઇન્ડર યાદી',
+'Appointment waiting list':'મુલાકાત પ્રતીક્ષા યાદી','Preferred date/time':'પસંદગીની તારીખ/સમય','Priority':'પ્રાથમિકતા','Normal':'સામાન્ય',
+'Reason':'કારણ','Add to waiting list':'પ્રતીક્ષા યાદીમાં ઉમેરો','Waiting list':'પ્રતીક્ષા યાદી','Medicine catalogue':'દવાઓની સૂચિ',
+'Medicine name *':'દવાનું નામ *','Generic name':'જેનેરિક નામ','Dosage form':'દવાનું સ્વરૂપ','Unit price (₹)':'એકમ કિંમત (₹)',
+'Add medicine':'દવા ઉમેરો','Medicine catalogue list':'દવાઓની સૂચિ','Inventory item / batch':'સ્ટોક વસ્તુ / બેચ',
+'Medicine catalogue item':'દવા સૂચિ વસ્તુ','Stock item name *':'સ્ટોક વસ્તુનું નામ *','Batch number':'બેચ નંબર','Expiry date':'સમાપ્તિ તારીખ',
+'Reorder level':'ફરી ઓર્ડર સ્તર','Purchase price (₹)':'ખરીદી કિંમત (₹)','Selling price (₹)':'વેચાણ કિંમત (₹)','Create stock item':'સ્ટોક વસ્તુ બનાવો',
+'Stock movement':'સ્ટોક હલનચલન','Stock item *':'સ્ટોક વસ્તુ *','Movement type':'હલનચલનનો પ્રકાર','Quantity *':'જથ્થો *','Unit cost (₹)':'એકમ ખર્ચ (₹)',
+'Purchase / add stock':'ખરીદી / સ્ટોક ઉમેરો','Return / add stock':'પરત / સ્ટોક ઉમેરો','Dispense / reduce stock':'વિતરણ / સ્ટોક ઘટાડો',
+'Wastage / reduce stock':'બગાડ / સ્ટોક ઘટાડો','Adjustment':'સમાયોજન','Reference':'સંદર્ભ','Post stock movement':'સ્ટોક હલનચલન નોંધો',
+'Stock register':'સ્ટોક રજિસ્ટર','Quantity':'જથ્થો','No patient selected':'દર્દી પસંદ નથી',
+'Rent':'ભાડું','Staff salary':'સ્ટાફ પગાર','Utilities':'વીજળી/પાણી ખર્ચ','Medical supplies':'તબીબી સામગ્રી','Equipment':'સાધનો'
 };
 function setClinicLanguage(lang){
  const gu=lang==='gu';document.documentElement.lang=gu?'gu':'en';
