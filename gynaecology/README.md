@@ -26,7 +26,7 @@ This application is maintained in its own `gynaecology/` folder and uses the exi
 
 ## Supabase additions
 
-New clinic tables are prefixed `gyn_`; row-level security is enabled on all 32 current `gyn_*` tables. New tables include reproductive health, fertility cases/cycles, labour, newborns, postnatal visits, consents, attachments, medicine catalogue, payments, expenses, reminders, waitlist and inventory.
+New clinic tables are prefixed `gyn_`; row-level security is enabled on all 27 current `gyn_*` tables. New tables include reproductive health, fertility cases/cycles, labour, newborns, postnatal visits, consents, attachments, medicine catalogue, payments, expenses, reminders, waitlist and inventory.
 
 Private file bucket: `gyn-private`. It is not public; storage policies scope file access to the clinic and authorised owner / doctor / nurse roles.
 
@@ -41,7 +41,7 @@ All three functions are SECURITY INVOKER and executable by authenticated users o
 
 - GitHub source updated and JavaScript syntax checked.
 - Public GitHub Pages HTML checked for the main feature modules.
-- Supabase schema verified: 32 `gyn_*` tables, all with RLS enabled.
+- Supabase schema verified: 27 `gyn_*` tables, all with RLS enabled.
 - Private storage bucket and four object policies verified.
 - Cross-clinic composite foreign-key constraints verified for new linked records.
 - RPC function grants verified: authenticated allowed, anon denied.
