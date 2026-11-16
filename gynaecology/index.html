@@ -291,9 +291,13 @@ function setClinicLanguage(lang){
    }
    ['placeholder','aria-label','title'].forEach(attr=>{
      if(el.hasAttribute(attr)){
-       const key='original'+attr;
-       if(!el.dataset[key])el.dataset[key]=el.getAttribute(attr);
-       const original=el.dataset[key];
+       // Use explicit data attributes: dataset keys cannot contain hyphens.
+       const dataKey='data-original-'+attr;
+       let original=el.getAttribute(dataKey);
+       if(original===null){
+         original=el.getAttribute(attr)||'';
+         el.setAttribute(dataKey,original);
+       }
        if(attr==='placeholder' && gu){
          const translated=I18N_GU[original];if(translated)el.setAttribute(attr,translated);
        }else if(!gu)el.setAttribute(attr,original);
