@@ -9,7 +9,7 @@
 <section id="loginPanel" class="panel login"><h2>Secure clinic login</h2><p class="muted">Sign in with your registered clinic account.</p><form id="loginForm"><div style="margin:12px 0"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div style="margin:12px 0"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><button class="btn" style="width:100%">Sign in</button></form><div id="loginMsg" aria-live="polite"></div><p class="small muted">Access is controlled by Supabase authentication and clinic membership. No public patient registration.</p></section>
 <section id="app" class="hidden">
 <div class="row between"><div><strong id="clinicName">Clinic</strong><div class="muted small" id="roleLabel"></div></div><span class="pill">Cloud database connected</span></div>
-<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button></div>
+<div class="nav" role="tablist"><button class="active" data-tab="dashboard">Dashboard</button><button data-tab="patients">Patients</button><button data-tab="appointments">Appointments</button><button data-tab="pregnancy">Pregnancy & ANC</button><button data-tab="clinical">Clinical records</button><button data-tab="billing">Billing</button><button data-tab="women">Women’s health</button><button data-tab="fertility">Fertility / IVF</button><button data-tab="labour">Labour & newborn</button><button data-tab="postnatal">Postnatal & consent</button><button data-tab="operations">Clinic operations</button></div>
 <section id="dashboard" class="section active"><div class="grid"><div class="card"><div class="muted">Patients</div><div class="stat" id="statPatients">—</div></div><div class="card"><div class="muted">Appointments</div><div class="stat" id="statAppointments">—</div></div><div class="card"><div class="muted">Ongoing pregnancies</div><div class="stat" id="statPregnancies">—</div></div></div><div class="panel" style="margin-top:15px"><h2>Today's appointments</h2><div id="todayList" class="muted">Loading…</div></div></section>
 <section id="patients" class="section"><div class="panel"><div class="row between"><h2>Patient register</h2><button class="btn" id="newPatient">+ Add patient</button></div><input id="patientSearch" placeholder="Search patient name, ID or phone" style="margin:8px 0 14px"><div class="tablewrap"><table><thead><tr><th>Patient ID</th><th>Name</th><th>Phone</th><th>Blood group</th><th>Action</th></tr></thead><tbody id="patientRows"></tbody></table></div></div>
 <div id="patientFormPanel" class="panel hidden" style="margin-top:14px"><h2 id="patientFormTitle">Register patient</h2><form id="patientForm"><div class="fields"><div class="field"><label>Patient ID *</label><input name="patient_code" required placeholder="e.g. GYN-0001"></div><div class="field"><label>Full name *</label><input name="full_name" required></div><div class="field"><label>Date of birth</label><input name="date_of_birth" type="date"></div><div class="field"><label>Phone</label><input name="phone" type="tel"></div><div class="field"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Blood group</label><select name="blood_group"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div><div class="field full"><label>Address</label><textarea name="address"></textarea></div><div class="field"><label>Allergies</label><textarea name="allergies"></textarea></div><div class="field"><label>Medical history</label><textarea name="medical_history"></textarea></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div></div><div class="row" style="margin-top:14px"><button class="btn">Save patient</button><button type="button" class="btn secondary" id="cancelPatient">Cancel</button></div><div id="patientMsg"></div></form></div></section>
@@ -76,6 +76,59 @@
 <div class="field"><label>Signed date/time</label><input name="signed_at" type="datetime-local"></div><div class="field"><label>Witness name</label><input name="witness_name"></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>
 </div><button class="btn" style="margin-top:12px">Save consent record</button><div id="consentMsg"></div></form></div>
 <div class="panel" style="margin-top:14px"><h2>Consent history</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Consent</th><th>Status</th><th>Signed at</th></tr></thead><tbody id="consentRows"></tbody></table></div></div></section>
+
+
+<section id="operations" class="section">
+<div class="panel"><h2>Record payment against invoice</h2><form id="paymentForm"><div class="fields">
+<div class="field"><label>Invoice *</label><select name="invoice_id" id="paymentInvoice" required></select></div>
+<div class="field"><label>Patient</label><select name="patient_id" id="paymentPatient" required></select></div>
+<div class="field"><label>Payment amount (₹) *</label><input name="amount" type="number" min=".01" step=".01" required></div>
+<div class="field"><label>Payment method</label><select name="payment_method"><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></div>
+<div class="field"><label>Reference number</label><input name="reference_number"></div><div class="field"><label>Notes</label><input name="notes"></div>
+</div><button class="btn" style="margin-top:12px">Record payment</button><div id="paymentMsg"></div></form></div>
+<div class="panel" style="margin-top:14px"><h2>Payment history</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Invoice</th><th>Patient</th><th>Amount</th><th>Method</th></tr></thead><tbody id="paymentRows"></tbody></table></div></div>
+
+<div class="panel" style="margin-top:14px"><h2>Clinic expenses</h2><form id="expenseForm"><div class="fields">
+<div class="field"><label>Date</label><input name="expense_date" type="date"></div><div class="field"><label>Category *</label><select name="category"><option>Rent</option><option>Staff salary</option><option>Utilities</option><option>Medical supplies</option><option>Equipment</option><option>Other</option></select></div>
+<div class="field"><label>Description *</label><input name="description" required></div><div class="field"><label>Amount (₹) *</label><input name="amount" type="number" min=".01" step=".01" required></div>
+<div class="field"><label>Vendor</label><input name="vendor"></div><div class="field"><label>Payment method</label><input name="payment_method"></div><div class="field"><label>Reference number</label><input name="reference_number"></div>
+</div><button class="btn" style="margin-top:12px">Save expense</button><div id="expenseMsg"></div></form></div>
+<div class="panel" style="margin-top:14px"><h2>Expense register</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Vendor</th></tr></thead><tbody id="expenseRows"></tbody></table></div></div>
+
+<div class="panel" style="margin-top:14px"><h2>Patient reminders / follow-up queue</h2><form id="reminderForm"><div class="fields">
+<div class="field"><label>Patient</label><select name="patient_id" id="reminderPatient"><option value="">No patient selected</option></select></div><div class="field"><label>Reminder type *</label><input name="reminder_type" required placeholder="ANC follow-up / review / appointment"></div>
+<div class="field"><label>Due date/time *</label><input name="due_at" type="datetime-local" required></div><div class="field"><label>Channel</label><select name="channel"><option value="internal">Internal task</option><option value="whatsapp">WhatsApp-ready</option><option value="email">Email-ready</option><option value="sms">SMS-ready</option></select></div>
+<div class="field full"><label>Message / staff note</label><textarea name="message"></textarea></div>
+</div><button class="btn" style="margin-top:12px">Create reminder</button><div id="reminderMsg"></div></form><p class="small muted">This creates an internal reminder or message draft. It does not send WhatsApp, SMS or email automatically.</p></div>
+<div class="panel" style="margin-top:14px"><h2>Reminder queue</h2><div class="tablewrap"><table><thead><tr><th>Due</th><th>Patient</th><th>Type</th><th>Channel</th><th>Status</th></tr></thead><tbody id="reminderRows"></tbody></table></div></div>
+
+<div class="panel" style="margin-top:14px"><h2>Appointment waiting list</h2><form id="waitlistForm"><div class="fields">
+<div class="field"><label>Patient *</label><select name="patient_id" id="waitlistPatient" required></select></div><div class="field"><label>Preferred date/time</label><input name="preferred_at" type="datetime-local"></div>
+<div class="field"><label>Priority</label><select name="priority"><option value="normal">Normal</option><option value="low">Low</option><option value="high">High</option></select></div>
+<div class="field"><label>Reason</label><input name="reason"></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>
+</div><button class="btn" style="margin-top:12px">Add to waiting list</button><div id="waitlistMsg"></div></form></div>
+<div class="panel" style="margin-top:14px"><h2>Waiting list</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Preferred</th><th>Priority</th><th>Status</th><th>Reason</th></tr></thead><tbody id="waitlistRows"></tbody></table></div></div>
+
+<div class="panel" style="margin-top:14px"><h2>Medicine catalogue</h2><form id="medicineForm"><div class="fields">
+<div class="field"><label>Medicine name *</label><input name="medicine_name" required></div><div class="field"><label>Generic name</label><input name="generic_name"></div>
+<div class="field"><label>Strength</label><input name="strength" placeholder="e.g. 500 mg"></div><div class="field"><label>Dosage form</label><input name="dosage_form" placeholder="Tablet / capsule / syrup"></div>
+<div class="field"><label>Route</label><input name="route" placeholder="Oral / topical / etc."></div><div class="field"><label>Unit price (₹)</label><input name="unit_price" type="number" min="0" step=".01"></div>
+<div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>
+</div><button class="btn" style="margin-top:12px">Add medicine</button><div id="medicineMsg"></div></form><p class="small muted">Catalogue entries are references only. Prescriptions must be authored and checked by the treating clinician.</p></div>
+<div class="panel" style="margin-top:14px"><h2>Medicine catalogue list</h2><div class="tablewrap"><table><thead><tr><th>Medicine</th><th>Generic</th><th>Strength</th><th>Form</th><th>Price</th></tr></thead><tbody id="medicineRows"></tbody></table></div></div>
+
+<div class="panel" style="margin-top:14px"><h2>Inventory item / batch</h2><form id="inventoryForm"><div class="fields">
+<div class="field"><label>Medicine catalogue item</label><select name="medicine_id" id="inventoryMedicine"><option value="">Not linked</option></select></div><div class="field"><label>Stock item name *</label><input name="item_name" required></div>
+<div class="field"><label>Batch number</label><input name="batch_number"></div><div class="field"><label>Expiry date</label><input name="expiry_date" type="date"></div>
+<div class="field"><label>Reorder level</label><input name="reorder_level" type="number" min="0" step=".001" value="0"></div><div class="field"><label>Purchase price (₹)</label><input name="purchase_price" type="number" min="0" step=".01"></div><div class="field"><label>Selling price (₹)</label><input name="selling_price" type="number" min="0" step=".01"></div>
+</div><button class="btn" style="margin-top:12px">Create stock item</button><div id="inventoryMsg"></div></form></div>
+<div class="panel" style="margin-top:14px"><h2>Stock movement</h2><form id="movementForm"><div class="fields">
+<div class="field"><label>Stock item *</label><select name="item_id" id="movementItem" required></select></div><div class="field"><label>Movement type</label><select name="movement_type"><option value="purchase">Purchase / add stock</option><option value="return">Return / add stock</option><option value="dispense">Dispense / reduce stock</option><option value="wastage">Wastage / reduce stock</option><option value="adjustment">Adjustment</option></select></div>
+<div class="field"><label>Quantity *</label><input name="quantity" type="number" min=".001" step=".001" required></div><div class="field"><label>Unit cost (₹)</label><input name="unit_cost" type="number" min="0" step=".01"></div>
+<div class="field"><label>Reference</label><input name="reference_text"></div><div class="field"><label>Notes</label><input name="notes"></div>
+</div><button class="btn" style="margin-top:12px">Post stock movement</button><div id="movementMsg"></div></form><p class="small muted">Dispense and wastage reduce stock. Negative stock is blocked. Confirm quantities against physical stock.</p></div>
+<div class="panel" style="margin-top:14px"><h2>Stock register</h2><div class="tablewrap"><table><thead><tr><th>Item</th><th>Batch</th><th>Expiry</th><th>Quantity</th><th>Reorder level</th></tr></thead><tbody id="inventoryRows"></tbody></table></div></div>
+</section>
 
 <p class="small muted" style="margin:18px 2px">Clinical record software only. It does not diagnose, prescribe, calculate clinical risk, or replace clinician judgement. Use only after completing privacy, access-control and workflow testing.</p>
 </section></main>
@@ -242,7 +295,7 @@ render=function(){renderOriginal();setClinicLanguage(localStorage.getItem('gyn_l
 
 
 let moduleData={};
-const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents'];
+const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing'];
 async function loadModuleLists(){
  const results=await Promise.all(MODULE_TABLES.map(t=>db.from(t).select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)));
  results.forEach((r,i)=>{if(r.error)throw r.error;moduleData[MODULE_TABLES[i]]=r.data||[]});
@@ -257,6 +310,16 @@ function fillModuleSelects(){
  ['newbornDelivery','postDelivery'].forEach(id=>{const el=$(id);if(el)el.innerHTML='<option value="">Select delivery</option>'+del});
  const cases=(moduleData.gyn_fertility_cases||[]).map(c=>'<option value="'+c.id+'">'+esc((c.case_code||c.case_type)+' · '+(patients.find(p=>p.id===c.patient_id)?.full_name||'Patient'))+'</option>').join('');
  if($('fertilityCase'))$('fertilityCase').innerHTML='<option value="">Select case</option>'+cases;
+ const patientSelect=(id,none)=>{const el=$(id);if(el)el.innerHTML=(none?'<option value="">'+none+'</option>':'<option value="">Select patient</option>')+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('')};
+ ['paymentPatient','reminderPatient'].forEach(id=>patientSelect(id,'Select patient'));
+ patientSelect('waitlistPatient','Select patient');
+ const invoices=moduleData.gyn_billing||[];
+ if($('paymentInvoice'))$('paymentInvoice').innerHTML='<option value="">Select invoice</option>'+invoices.map(i=>'<option value="'+i.id+'">'+esc(i.invoice_number+' · ₹'+i.total+' · due ₹'+Math.max(0,Number(i.total)-Number(i.paid_amount||0)).toFixed(2))+'</option>').join('');
+ const medicines=moduleData.gyn_medicine_catalog||[];
+ if($('inventoryMedicine'))$('inventoryMedicine').innerHTML='<option value="">Not linked</option>'+medicines.map(m=>'<option value="'+m.id+'">'+esc(m.medicine_name+' '+(m.strength||''))+'</option>').join('');
+ const items=moduleData.gyn_inventory_items||[];
+ if($('movementItem'))$('movementItem').innerHTML='<option value="">Select stock item</option>'+items.map(i=>'<option value="'+i.id+'">'+esc(i.item_name+' · '+(i.batch_number||'no batch')+' · qty '+i.quantity)+'</option>').join('');
+
 }
 function tableRows(id,rows,cols,empty='No records yet.'){
  const body=$(id);if(!body)return;
@@ -272,6 +335,14 @@ function renderModuleLists(){
  tableRows('newbornRows',moduleData.gyn_newborn_records||[],[r=>r.newborn_code||'—',r=>r.sex||'—',r=>r.birth_weight_kg??'—',r=>(r.apgar_1_min??'—')+' / '+(r.apgar_5_min??'—'),r=>r.neonatal_status||'—']);
  tableRows('postnatalRows',moduleData.gyn_postnatal_visits||[],[r=>pname(r.patient_id),r=>isoLocal(r.visit_at),r=>dateOnly(r.next_visit_date),r=>r.feeding_method||'—']);
  tableRows('consentRows',moduleData.gyn_consents||[],[r=>pname(r.patient_id),r=>r.consent_type,r=>r.status,r=>isoLocal(r.signed_at)]);
+ const invoices=moduleData.gyn_billing||[];
+ tableRows('paymentRows',moduleData.gyn_payments||[],[r=>isoLocal(r.paid_at),r=>invoices.find(i=>i.id===r.invoice_id)?.invoice_number||'Invoice',r=>pname(r.patient_id),r=>'₹'+Number(r.amount).toFixed(2),r=>r.payment_method]);
+ tableRows('expenseRows',moduleData.gyn_expenses||[],[r=>dateOnly(r.expense_date),r=>r.category,r=>r.description,r=>'₹'+Number(r.amount).toFixed(2),r=>r.vendor||'—']);
+ tableRows('reminderRows',moduleData.gyn_reminders||[],[r=>isoLocal(r.due_at),r=>pname(r.patient_id),r=>r.reminder_type,r=>r.channel,r=>r.status]);
+ tableRows('waitlistRows',moduleData.gyn_waitlist||[],[r=>pname(r.patient_id),r=>isoLocal(r.preferred_at),r=>r.priority,r=>r.status,r=>r.reason||'—']);
+ tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[r=>r.medicine_name,r=>r.generic_name||'—',r=>r.strength||'—',r=>r.dosage_form||'—',r=>r.unit_price==null?'—':'₹'+Number(r.unit_price).toFixed(2)]);
+ tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[r=>r.item_name,r=>r.batch_number||'—',r=>dateOnly(r.expiry_date),r=>r.quantity,r=>r.reorder_level]);
+
 }
 const loadAllBeforeModules=loadAll;
 loadAll=async function(){await loadAllBeforeModules();const [d]=await Promise.all([db.from('gyn_deliveries').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)]);if(d.error)throw d.error;moduleData.gyn_deliveries=d.data||[];await loadModuleLists()};
@@ -299,6 +370,47 @@ bindModuleForm('labourForm','gyn_labour_records',[],['admitted_at','labour_onset
 bindModuleForm('newbornForm','gyn_newborn_records',['birth_weight_kg','apgar_1_min','apgar_5_min'],['birth_datetime']);
 bindModuleForm('postnatalForm','gyn_postnatal_visits',[],['visit_at']);
 bindModuleForm('consentForm','gyn_consents',[],['signed_at']);
+
+function bindSimpleModuleForm(id,table,numberFields=[],dateTimeFields=[]){
+ const form=$(id);if(!form)return;
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();const raw=formObj(form),payload={clinic_id:clinic.id};
+  for(const [k,v] of Object.entries(raw)){
+   if(v===''){payload[k]=null;continue}
+   if(numberFields.includes(k)){payload[k]=Number(v);continue}
+   if(dateTimeFields.includes(k)){payload[k]=new Date(v).toISOString();continue}
+   payload[k]=v;
+  }
+  const {error}=await db.from(table).insert(payload);
+  if(error){msg(id.replace('Form','Msg'),error.message,true);return}
+  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'record_created',entity_type:table,details:{source:'clinic_app'}});
+  form.reset();msg(id.replace('Form','Msg'),'Record saved.');await loadModuleLists();
+ });
+}
+bindSimpleModuleForm('expenseForm','gyn_expenses',['amount'],[]);
+bindSimpleModuleForm('reminderForm','gyn_reminders',[],['due_at']);
+bindSimpleModuleForm('waitlistForm','gyn_waitlist',[],['preferred_at']);
+bindSimpleModuleForm('medicineForm','gyn_medicine_catalog',['unit_price']);
+bindSimpleModuleForm('inventoryForm','gyn_inventory_items',['reorder_level','purchase_price','selling_price']);
+$('paymentInvoice').addEventListener('change',()=>{
+ const inv=(moduleData.gyn_billing||[]).find(x=>x.id===$('paymentInvoice').value);
+ if(inv)$('paymentPatient').value=inv.patient_id;
+});
+$('paymentForm').addEventListener('submit',async e=>{
+ e.preventDefault();const p=formObj(e.currentTarget);
+ const {error}=await db.rpc('gyn_record_payment',{p_invoice_id:p.invoice_id,p_patient_id:p.patient_id,p_amount:Number(p.amount),p_payment_method:p.payment_method,p_reference_number:p.reference_number||null,p_notes:p.notes||null});
+ if(error){msg('paymentMsg',error.message,true);return}
+ e.currentTarget.reset();msg('paymentMsg','Payment recorded and invoice balance updated.');await loadModuleLists();
+});
+$('movementForm').addEventListener('submit',async e=>{
+ e.preventDefault();const p=formObj(e.currentTarget);let qty=Math.abs(Number(p.quantity));
+ if(['dispense','wastage'].includes(p.movement_type))qty=-qty;
+ if(p.movement_type==='adjustment' && p.quantity.startsWith('-'))qty=-qty;
+ const {error}=await db.rpc('gyn_record_inventory_movement',{p_item_id:p.item_id,p_movement_type:p.movement_type,p_quantity_change:qty,p_unit_cost:p.unit_cost?Number(p.unit_cost):null,p_reference_text:p.reference_text||null,p_notes:p.notes||null});
+ if(error){msg('movementMsg',error.message,true);return}
+ e.currentTarget.reset();msg('movementMsg','Stock movement posted.');await loadModuleLists();
+});
+
 
 boot();
 </script></body></html>
