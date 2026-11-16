@@ -388,30 +388,44 @@ function fillModuleSelects(){
  if($('movementItem'))$('movementItem').innerHTML='<option value="">Select stock item</option>'+items.map(i=>'<option value="'+i.id+'">'+esc(i.item_name+' · '+(i.batch_number||'no batch')+' · qty '+i.quantity)+'</option>').join('');
 
 }
-function tableRows(id,rows,cols,empty='No records yet.'){
- const body=$(id);if(!body)return;
- body.innerHTML=rows.length?rows.map(row=>'<tr>'+cols.map(c=>'<td>'+esc(c(row))+'</td>').join('')+'</tr>').join(''):'<tr><td class="empty" colspan="'+cols.length+'">'+esc(empty)+'</td></tr>';
+function safeCellValue(record,field){
+ const value=record?.[field];
+ if(value===null||value===undefined||value==='')return '—';
+ if(typeof value==='object')return JSON.stringify(value);
+ if(field.endsWith('_date'))return dateOnly(String(value).slice(0,10));
+ if(field.endsWith('_at'))return isoLocal(value);
+ return String(value);
+}
+function renderSafeTable(elementId,records,fields,emptyText){
+ const target=$(elementId);if(!target)return;
+ const data=Array.isArray(records)?records:[];
+ if(data.length===0){target.innerHTML='<tr><td class="empty" colspan="'+fields.length+'">'+esc(emptyText||'No records yet.')+'</td></tr>';return}
+ target.innerHTML=data.map(record=>{
+  const cells=fields.map(field=>'<td>'+esc(safeCellValue(record,field))+'</td>').join('');
+  return '<tr>'+cells+'</tr>';
+ }).join('');
 }
 function renderModuleLists(){
- const pname=id=>patients.find(p=>p.id===id)?.full_name||'Patient';
- const cases=moduleData.gyn_fertility_cases||[];
- tableRows('womenRows',moduleData.gyn_reproductive_health||[],[row=>pname(row.patient_id),row=>row.record_type,row=>dateOnly(row.event_date),row=>row.cycle_length_days??'—',row=>row.symptoms||'—']);
- tableRows('fertilityRows',cases,[row=>pname(row.patient_id),row=>row.case_code||'—',row=>row.case_type,row=>dateOnly(row.started_on),row=>row.status]);
- tableRows('fertilityCycleRows',moduleData.gyn_fertility_cycles||[],[row=>cases.find(c=>c.id===row.case_id)?.case_code||'Case',row=>row.cycle_number,row=>row.cycle_type,row=>dateOnly(row.transfer_date),row=>row.outcome||'—']);
- tableRows('labourRows',moduleData.gyn_labour_records||[],[row=>pname(row.patient_id),row=>isoLocal(row.admitted_at),row=>isoLocal(row.delivery_at),row=>row.labour_status]);
- tableRows('newbornRows',moduleData.gyn_newborn_records||[],[row=>row.newborn_code||'—',row=>row.sex||'—',row=>row.birth_weight_kg??'—',row=>(row.apgar_1_min??'—')+' / '+(row.apgar_5_min??'—'),row=>row.neonatal_status||'—']);
- tableRows('postnatalRows',moduleData.gyn_postnatal_visits||[],[row=>pname(row.patient_id),row=>isoLocal(row.visit_at),row=>dateOnly(row.next_visit_date),row=>row.feeding_method||'—']);
- tableRows('consentRows',moduleData.gyn_consents||[],[row=>pname(row.patient_id),row=>row.consent_type,row=>row.status,row=>isoLocal(row.signed_at)]);
- const invoices=moduleData.gyn_billing||[];
- tableRows('paymentRows',moduleData.gyn_payments||[],[row=>isoLocal(row.paid_at),row=>invoices.find(i=>i.id===row.invoice_id)?.invoice_number||'Invoice',row=>pname(row.patient_id),row=>'₹'+Number(row.amount).toFixed(2),row=>row.payment_method]);
- tableRows('expenseRows',moduleData.gyn_expenses||[],[row=>dateOnly(row.expense_date),row=>row.category,row=>row.description,row=>'₹'+Number(row.amount).toFixed(2),row=>row.vendor||'—']);
- tableRows('reminderRows',moduleData.gyn_reminders||[],[row=>isoLocal(row.due_at),row=>pname(row.patient_id),row=>row.reminder_type,row=>row.channel,row=>row.status]);
- tableRows('waitlistRows',moduleData.gyn_waitlist||[],[row=>pname(row.patient_id),row=>isoLocal(row.preferred_at),row=>row.priority,row=>row.status,row=>row.reason||'—']);
- tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[row=>row.medicine_name,row=>row.generic_name||'—',row=>row.strength||'—',row=>row.dosage_form||'—',row=>row.unit_price==null?'—':'₹'+Number(row.unit_price).toFixed(2)]);
- tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[row=>row.item_name,row=>row.batch_number||'—',row=>dateOnly(row.expiry_date),row=>row.quantity,row=>row.reorder_level]);
- const attachmentBody=$('attachmentRows');if(attachmentBody){const docs=moduleData.gyn_attachments||[];attachmentBody.innerHTML=docs.length?docs.map(row=>'<tr><td>'+esc(pname(row.patient_id))+'</td><td>'+esc(row.original_filename)+'</td><td>'+esc(row.entity_type)+'</td><td>'+esc(isoLocal(row.created_at))+'</td><td><button class="btn secondary" data-attachment="'+row.id+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>'}
-
-
+ const cases=Array.isArray(moduleData.gyn_fertility_cases)?moduleData.gyn_fertility_cases:[];
+ const invoices=Array.isArray(moduleData.gyn_billing)?moduleData.gyn_billing:[];
+ renderSafeTable('womenRows',moduleData.gyn_reproductive_health,['patient_id','record_type','event_date','cycle_length_days','symptoms']);
+ renderSafeTable('fertilityRows',cases,['patient_id','case_code','case_type','started_on','status']);
+ renderSafeTable('fertilityCycleRows',moduleData.gyn_fertility_cycles,['case_id','cycle_number','cycle_type','transfer_date','outcome']);
+ renderSafeTable('labourRows',moduleData.gyn_labour_records,['patient_id','admitted_at','delivery_at','labour_status']);
+ renderSafeTable('newbornRows',moduleData.gyn_newborn_records,['newborn_code','sex','birth_weight_kg','apgar_1_min','neonatal_status']);
+ renderSafeTable('postnatalRows',moduleData.gyn_postnatal_visits,['patient_id','visit_at','next_visit_date','feeding_method']);
+ renderSafeTable('consentRows',moduleData.gyn_consents,['patient_id','consent_type','status','signed_at']);
+ renderSafeTable('paymentRows',moduleData.gyn_payments,['paid_at','invoice_id','patient_id','amount','payment_method']);
+ renderSafeTable('expenseRows',moduleData.gyn_expenses,['expense_date','category','description','amount','vendor']);
+ renderSafeTable('reminderRows',moduleData.gyn_reminders,['due_at','patient_id','reminder_type','channel','status']);
+ renderSafeTable('waitlistRows',moduleData.gyn_waitlist,['patient_id','preferred_at','priority','status','reason']);
+ renderSafeTable('medicineRows',moduleData.gyn_medicine_catalog,['medicine_name','generic_name','strength','dosage_form','unit_price']);
+ renderSafeTable('inventoryRows',moduleData.gyn_inventory_items,['item_name','batch_number','expiry_date','quantity','reorder_level']);
+ const attachmentTarget=$('attachmentRows');
+ if(attachmentTarget){
+  const documents=Array.isArray(moduleData.gyn_attachments)?moduleData.gyn_attachments:[];
+  attachmentTarget.innerHTML=documents.length?documents.map(documentRecord=>'<tr><td>'+esc(documentRecord.patient_id||'—')+'</td><td>'+esc(documentRecord.original_filename||'—')+'</td><td>'+esc(documentRecord.entity_type||'—')+'</td><td>'+esc(isoLocal(documentRecord.created_at))+'</td><td><button class="btn secondary" data-attachment="'+esc(documentRecord.id)+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>';
+ }
 }
 const loadAllBeforeModules=loadAll;
 loadAll=async function(){await loadAllBeforeModules();const [d]=await Promise.all([db.from('gyn_deliveries').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)]);if(d.error)throw d.error;moduleData.gyn_deliveries=d.data||[];await loadModuleLists()};
