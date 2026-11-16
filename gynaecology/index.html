@@ -471,7 +471,7 @@ function downloadCsv(filename,rows){
  if(!rows.length){alert('No records available to export.');return}
  const keys=[...new Set(rows.flatMap(row=>Object.keys(row)))];
  const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
- const csv=[keys.map(quote).join(','),...rows.map(row=>keys.map(k=>quote(typeof row[k]==='object'?JSON.stringify(row[k]):row[k])).join(','))].join('\row\n');
+ const csv=[keys.map(quote).join(','),...rows.map(row=>keys.map(k=>quote(typeof row[k]==='object'?JSON.stringify(row[k]):row[k])).join(','))].join('\r\n');
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 $('exportPatientsCsv').onclick=()=>{if(!['owner','doctor'].includes(role)){alert('Only owner or doctor can export patient data.');return}if(confirm('Export confidential patient information to CSV?'))downloadCsv('clinic-patients.csv',patients)};
