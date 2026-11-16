@@ -396,8 +396,8 @@ function renderModuleLists(){
  const pname=id=>patients.find(p=>p.id===id)?.full_name||'Patient';
  const cases=moduleData.gyn_fertility_cases||[];
  tableRows('womenRows',moduleData.gyn_reproductive_health||[],[row=>pname(row.patient_id),row=>row.record_type,row=>dateOnly(row.event_date),row=>row.cycle_length_days??'—',row=>row.symptoms||'—']);
- tableRows('fertilityRows',cases,[row=>pname(row.patient_id),row=>row.case_code||'—',row=>row.case_type,dateOnly(row.started_on),row=>row.status]);
- tableRows('fertilityCycleRows',moduleData.gyn_fertility_cycles||[],[row=>cases.find(c=>c.id===row.case_id)?.case_code||'Case',row=>row.cycle_number,row=>row.cycle_type,dateOnly(row.transfer_date),row=>row.outcome||'—']);
+ tableRows('fertilityRows',cases,[row=>pname(row.patient_id),row=>row.case_code||'—',row=>row.case_type,row=>dateOnly(row.started_on),row=>row.status]);
+ tableRows('fertilityCycleRows',moduleData.gyn_fertility_cycles||[],[row=>cases.find(c=>c.id===row.case_id)?.case_code||'Case',row=>row.cycle_number,row=>row.cycle_type,row=>dateOnly(row.transfer_date),row=>row.outcome||'—']);
  tableRows('labourRows',moduleData.gyn_labour_records||[],[row=>pname(row.patient_id),row=>isoLocal(row.admitted_at),row=>isoLocal(row.delivery_at),row=>row.labour_status]);
  tableRows('newbornRows',moduleData.gyn_newborn_records||[],[row=>row.newborn_code||'—',row=>row.sex||'—',row=>row.birth_weight_kg??'—',row=>(row.apgar_1_min??'—')+' / '+(row.apgar_5_min??'—'),row=>row.neonatal_status||'—']);
  tableRows('postnatalRows',moduleData.gyn_postnatal_visits||[],[row=>pname(row.patient_id),row=>isoLocal(row.visit_at),row=>dateOnly(row.next_visit_date),row=>row.feeding_method||'—']);
