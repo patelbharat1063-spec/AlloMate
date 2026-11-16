@@ -185,7 +185,7 @@ function isoLocal(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleString('en
 function dateOnly(d){return d?new Date(d+'T00:00:00').toLocaleDateString('en-IN'):'—'}
 function ageWeeks(lmp){if(!lmp)return '—';const days=Math.floor((Date.now()-new Date(lmp+'T00:00:00').getTime())/86400000);return days<0?'Check LMP':Math.floor(days/7)+'w '+days%7+'d'}
 async function loadClinic(){const {data,error}=await db.from('gyn_memberships').select('clinic_id,role,is_active,gyn_clinics(id,clinic_name,timezone)').eq('user_id',user.id).eq('is_active',true);if(error)throw error;const m=(data||[]).find(x=>x.gyn_clinics);if(!m)throw new Error('No active clinic membership is assigned to this account. Ask the clinic owner.');clinic=m.gyn_clinics;role=m.role;$('clinicName').textContent=clinic.clinic_name;$('roleLabel').textContent='Signed in as '+role+' · '+user.email}
-async function loadAll(){const [p,a,g]=await Promise.all([db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false}),db.from('gyn_appointments').select('*').eq('clinic_id',clinic.id).order('appointment_at',{ascending:false}).limit(150),db.from('gyn_pregnancies').select('*').eq('clinic_id',clinic.id).eq('status','ongoing').order('created_at',{ascending:false})]);for(const r of [p,a,g])if(r.error)throw r.error;patients=p.data||[];appointments=a.data||[];pregnancies=g.data||[];render()}
+async function loadAll(){const [p,a,g]=await Promise.all([db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false}),db.from('gyn_appointments').select('*').eq('clinic_id',clinic.id).order('appointment_at',{ascending:false}).limit(150),db.from('gyn_pregnancies').select('*').eq('clinic_id',clinic.id).eq('status','ongoing').order('created_at',{ascending:false})]);for(const row of [p,a,g])if(row.error)throw row.error;patients=p.data||[];appointments=a.data||[];pregnancies=g.data||[];render()}
 function render(){const pmap=Object.fromEntries(patients.map(p=>[p.id,p]));$('statPatients').textContent=patients.length;$('statAppointments').textContent=appointments.length;$('statPregnancies').textContent=pregnancies.length;
 $('patientRows').innerHTML=patients.map(p=>'<tr><td>'+esc(p.patient_code)+'</td><td>'+esc(p.full_name)+'</td><td>'+esc(p.phone||'—')+'</td><td>'+esc(p.blood_group||'—')+'</td><td><button class="btn secondary" data-edit="'+p.id+'">Edit</button> <button class="btn secondary" data-print="'+p.id+'">Print</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No patients registered.</td></tr>';
 $('appointmentPatient').innerHTML='<option value="">Select patient</option>'+patients.map(p=>'<option value="'+p.id+'">'+esc(p.patient_code+' · '+p.full_name)+'</option>').join('');
@@ -203,7 +203,7 @@ $('newPatient').onclick=()=>{editingPatient=null;$('patientForm').reset();$('pat
 $('cancelPatient').onclick=()=>$('patientFormPanel').classList.add('hidden');
 $('patientForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;const payload=formObj(f);payload.clinic_id=clinic.id;payload.emergency_contact={};if(!payload.date_of_birth)delete payload.date_of_birth;for(const k of ['phone','email','address','blood_group','allergies','medical_history','notes'])if(!payload[k])payload[k]=null;const q=editingPatient?db.from('gyn_patients').update(payload).eq('id',editingPatient).eq('clinic_id',clinic.id):db.from('gyn_patients').insert(payload);const {error}=await q;if(error){msg('patientMsg',error.message,true);return}msg('patientMsg','Patient saved.');$('patientFormPanel').classList.add('hidden');await loadAll()};
 $('patientRows').onclick=async e=>{const printId=e.target.dataset.print;if(printId){const patient=patients.find(x=>x.id===printId);if(patient)printPatientSummary(patient);return}const id=e.target.dataset.edit;if(!id)return;const p=patients.find(x=>x.id===id);if(!p)return;editingPatient=id;$('patientForm').reset();for(const [k,v] of Object.entries(p))if($('patientForm').elements[k])$('patientForm').elements[k].value=v??'';$('patientFormTitle').textContent='Edit patient · '+p.patient_code;$('patientFormPanel').classList.remove('hidden');$('patientFormPanel').scrollIntoView({behavior:'smooth'})};
-$('patientSearch').oninput=e=>{const term=e.target.value.toLowerCase();document.querySelectorAll('#patientRows tr').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(term)?'':'none')};
+$('patientSearch').oninput=e=>{const term=e.target.value.toLowerCase();document.querySelectorAll('#patientRows tr').forEach(row=>row.style.display=row.textContent.toLowerCase().includes(term)?'':'none')};
 $('appointmentForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;const p=formObj(f);p.clinic_id=clinic.id;p.appointment_at=new Date(p.appointment_at).toISOString();p.fee=p.fee?Number(p.fee):null;p.reason=p.reason||null;const {error}=await db.from('gyn_appointments').insert(p);if(error){msg('appointmentMsg',error.message,true);return}f.reset();msg('appointmentMsg','Appointment saved.');await loadAll()};
 $('appointmentRows').onclick=async e=>{const id=e.target.dataset.done;if(!id)return;if(!confirm('Mark this appointment as completed?'))return;const {error}=await db.from('gyn_appointments').update({status:'completed'}).eq('id',id).eq('clinic_id',clinic.id);if(error){alert(error.message);return}await loadAll()};
 $('lmpDate').onchange=()=>{const v=$('lmpDate').value;if(!v){$('eddDate').value='';return}const d=new Date(v+'T00:00:00');d.setDate(d.getDate()+280);$('eddDate').value=d.toISOString().slice(0,10)};
@@ -364,7 +364,7 @@ let moduleData={};
 const MODULE_TABLES=['gyn_reproductive_health','gyn_fertility_cases','gyn_fertility_cycles','gyn_labour_records','gyn_newborn_records','gyn_postnatal_visits','gyn_consents','gyn_attachments','gyn_medicine_catalog','gyn_payments','gyn_expenses','gyn_reminders','gyn_waitlist','gyn_inventory_items','gyn_inventory_movements','gyn_billing'];
 async function loadModuleLists(){
  const results=await Promise.all(MODULE_TABLES.map(t=>db.from(t).select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)));
- results.forEach((r,i)=>{if(r.error)throw r.error;moduleData[MODULE_TABLES[i]]=r.data||[]});
+ results.forEach((row,i)=>{if(row.error)throw row.error;moduleData[MODULE_TABLES[i]]=row.data||[]});
  fillModuleSelects();renderModuleLists();
 }
 function fillModuleSelects(){
@@ -390,26 +390,26 @@ function fillModuleSelects(){
 }
 function tableRows(id,rows,cols,empty='No records yet.'){
  const body=$(id);if(!body)return;
- body.innerHTML=rows.length?rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(c(r))+'</td>').join('')+'</tr>').join(''):'<tr><td class="empty" colspan="'+cols.length+'">'+esc(empty)+'</td></tr>';
+ body.innerHTML=rows.length?rows.map(row=>'<tr>'+cols.map(c=>'<td>'+esc(c(row))+'</td>').join('')+'</tr>').join(''):'<tr><td class="empty" colspan="'+cols.length+'">'+esc(empty)+'</td></tr>';
 }
 function renderModuleLists(){
  const pname=id=>patients.find(p=>p.id===id)?.full_name||'Patient';
  const cases=moduleData.gyn_fertility_cases||[];
- tableRows('womenRows',moduleData.gyn_reproductive_health||[],[r=>pname(r.patient_id),r=>r.record_type,r=>dateOnly(r.event_date),r=>r.cycle_length_days??'—',r=>r.symptoms||'—']);
- tableRows('fertilityRows',cases,[r=>pname(r.patient_id),r=>r.case_code||'—',r=>r.case_type,dateOnly(r.started_on),r=>r.status]);
- tableRows('fertilityCycleRows',moduleData.gyn_fertility_cycles||[],[r=>cases.find(c=>c.id===r.case_id)?.case_code||'Case',r=>r.cycle_number,r=>r.cycle_type,dateOnly(r.transfer_date),r=>r.outcome||'—']);
- tableRows('labourRows',moduleData.gyn_labour_records||[],[r=>pname(r.patient_id),r=>isoLocal(r.admitted_at),r=>isoLocal(r.delivery_at),r=>r.labour_status]);
- tableRows('newbornRows',moduleData.gyn_newborn_records||[],[r=>r.newborn_code||'—',r=>r.sex||'—',r=>r.birth_weight_kg??'—',r=>(r.apgar_1_min??'—')+' / '+(r.apgar_5_min??'—'),r=>r.neonatal_status||'—']);
- tableRows('postnatalRows',moduleData.gyn_postnatal_visits||[],[r=>pname(r.patient_id),r=>isoLocal(r.visit_at),r=>dateOnly(r.next_visit_date),r=>r.feeding_method||'—']);
- tableRows('consentRows',moduleData.gyn_consents||[],[r=>pname(r.patient_id),r=>r.consent_type,r=>r.status,r=>isoLocal(r.signed_at)]);
+ tableRows('womenRows',moduleData.gyn_reproductive_health||[],[row=>pname(row.patient_id),row=>row.record_type,row=>dateOnly(row.event_date),row=>row.cycle_length_days??'—',row=>row.symptoms||'—']);
+ tableRows('fertilityRows',cases,[row=>pname(row.patient_id),row=>row.case_code||'—',row=>row.case_type,dateOnly(row.started_on),row=>row.status]);
+ tableRows('fertilityCycleRows',moduleData.gyn_fertility_cycles||[],[row=>cases.find(c=>c.id===row.case_id)?.case_code||'Case',row=>row.cycle_number,row=>row.cycle_type,dateOnly(row.transfer_date),row=>row.outcome||'—']);
+ tableRows('labourRows',moduleData.gyn_labour_records||[],[row=>pname(row.patient_id),row=>isoLocal(row.admitted_at),row=>isoLocal(row.delivery_at),row=>row.labour_status]);
+ tableRows('newbornRows',moduleData.gyn_newborn_records||[],[row=>row.newborn_code||'—',row=>row.sex||'—',row=>row.birth_weight_kg??'—',row=>(row.apgar_1_min??'—')+' / '+(row.apgar_5_min??'—'),row=>row.neonatal_status||'—']);
+ tableRows('postnatalRows',moduleData.gyn_postnatal_visits||[],[row=>pname(row.patient_id),row=>isoLocal(row.visit_at),row=>dateOnly(row.next_visit_date),row=>row.feeding_method||'—']);
+ tableRows('consentRows',moduleData.gyn_consents||[],[row=>pname(row.patient_id),row=>row.consent_type,row=>row.status,row=>isoLocal(row.signed_at)]);
  const invoices=moduleData.gyn_billing||[];
- tableRows('paymentRows',moduleData.gyn_payments||[],[r=>isoLocal(r.paid_at),r=>invoices.find(i=>i.id===r.invoice_id)?.invoice_number||'Invoice',r=>pname(r.patient_id),r=>'₹'+Number(r.amount).toFixed(2),r=>r.payment_method]);
- tableRows('expenseRows',moduleData.gyn_expenses||[],[r=>dateOnly(r.expense_date),r=>r.category,r=>r.description,r=>'₹'+Number(r.amount).toFixed(2),r=>r.vendor||'—']);
- tableRows('reminderRows',moduleData.gyn_reminders||[],[r=>isoLocal(r.due_at),r=>pname(r.patient_id),r=>r.reminder_type,r=>r.channel,r=>r.status]);
- tableRows('waitlistRows',moduleData.gyn_waitlist||[],[r=>pname(r.patient_id),r=>isoLocal(r.preferred_at),r=>r.priority,r=>r.status,r=>r.reason||'—']);
- tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[r=>r.medicine_name,r=>r.generic_name||'—',r=>r.strength||'—',r=>r.dosage_form||'—',r=>r.unit_price==null?'—':'₹'+Number(r.unit_price).toFixed(2)]);
- tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[r=>r.item_name,r=>r.batch_number||'—',r=>dateOnly(r.expiry_date),r=>r.quantity,r=>r.reorder_level]);
- const attachmentBody=$('attachmentRows');if(attachmentBody){const docs=moduleData.gyn_attachments||[];attachmentBody.innerHTML=docs.length?docs.map(r=>'<tr><td>'+esc(pname(r.patient_id))+'</td><td>'+esc(r.original_filename)+'</td><td>'+esc(r.entity_type)+'</td><td>'+esc(isoLocal(r.created_at))+'</td><td><button class="btn secondary" data-attachment="'+r.id+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>'}
+ tableRows('paymentRows',moduleData.gyn_payments||[],[row=>isoLocal(row.paid_at),row=>invoices.find(i=>i.id===row.invoice_id)?.invoice_number||'Invoice',row=>pname(row.patient_id),row=>'₹'+Number(row.amount).toFixed(2),row=>row.payment_method]);
+ tableRows('expenseRows',moduleData.gyn_expenses||[],[row=>dateOnly(row.expense_date),row=>row.category,row=>row.description,row=>'₹'+Number(row.amount).toFixed(2),row=>row.vendor||'—']);
+ tableRows('reminderRows',moduleData.gyn_reminders||[],[row=>isoLocal(row.due_at),row=>pname(row.patient_id),row=>row.reminder_type,row=>row.channel,row=>row.status]);
+ tableRows('waitlistRows',moduleData.gyn_waitlist||[],[row=>pname(row.patient_id),row=>isoLocal(row.preferred_at),row=>row.priority,row=>row.status,row=>row.reason||'—']);
+ tableRows('medicineRows',moduleData.gyn_medicine_catalog||[],[row=>row.medicine_name,row=>row.generic_name||'—',row=>row.strength||'—',row=>row.dosage_form||'—',row=>row.unit_price==null?'—':'₹'+Number(row.unit_price).toFixed(2)]);
+ tableRows('inventoryRows',moduleData.gyn_inventory_items||[],[row=>row.item_name,row=>row.batch_number||'—',row=>dateOnly(row.expiry_date),row=>row.quantity,row=>row.reorder_level]);
+ const attachmentBody=$('attachmentRows');if(attachmentBody){const docs=moduleData.gyn_attachments||[];attachmentBody.innerHTML=docs.length?docs.map(row=>'<tr><td>'+esc(pname(row.patient_id))+'</td><td>'+esc(row.original_filename)+'</td><td>'+esc(row.entity_type)+'</td><td>'+esc(isoLocal(row.created_at))+'</td><td><button class="btn secondary" data-attachment="'+row.id+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>'}
 
 
 }
@@ -464,14 +464,14 @@ bindSimpleModuleForm('inventoryForm','gyn_inventory_items',['reorder_level','pur
 
 function printPatientSummary(p){
  const rows=[['Patient ID',p.patient_code],['Name',p.full_name],['Date of birth',p.date_of_birth||'—'],['Phone',p.phone||'—'],['Email',p.email||'—'],['Blood group',p.blood_group||'—'],['Address',p.address||'—'],['Allergies',p.allergies||'—'],['Medical history',p.medical_history||'—'],['Notes',p.notes||'—']];
- const doc='<!doctype html><html><head><meta charset="utf-8"><title>Patient summary</title><style>body{font:14px Arial,sans-serif;padding:28px;color:#173b37}h1{font-size:20px}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:9px;vertical-align:top}td:first-child{font-weight:bold;width:28%;background:#f3f7f5}.muted{color:#667b77;font-size:12px}@media print{button{display:none}}</style></head><body><h1>'+esc(clinic.clinic_name)+' · Patient summary</h1><p class="muted">Printed '+esc(new Date().toLocaleString('en-IN'))+' · Confidential</p><table>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('')+'</table><p class="muted">This is a patient demographic summary, not a clinical diagnosis or treatment document.</p><button onclick="window.print()">Print / Save as PDF</button></body></html>';
+ const doc='<!doctype html><html><head><meta charset="utf-8"><title>Patient summary</title><style>body{font:14px Arial,sans-serif;padding:28px;color:#173b37}h1{font-size:20px}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:9px;vertical-align:top}td:first-child{font-weight:bold;width:28%;background:#f3f7f5}.muted{color:#667b77;font-size:12px}@media print{button{display:none}}</style></head><body><h1>'+esc(clinic.clinic_name)+' · Patient summary</h1><p class="muted">Printed '+esc(new Date().toLocaleString('en-IN'))+' · Confidential</p><table>'+rows.map(row=>'<tr><td>'+esc(row[0])+'</td><td>'+esc(row[1])+'</td></tr>').join('')+'</table><p class="muted">This is a patient demographic summary, not a clinical diagnosis or treatment document.</p><button onclick="window.print()">Print / Save as PDF</button></body></html>';
  const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the patient summary.');return}w.document.open();w.document.write(doc);w.document.close();w.focus();
 }
 function downloadCsv(filename,rows){
  if(!rows.length){alert('No records available to export.');return}
- const keys=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+ const keys=[...new Set(rows.flatMap(row=>Object.keys(row)))];
  const quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
- const csv=[keys.map(quote).join(','),...rows.map(r=>keys.map(k=>quote(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])).join(','))].join('\r\n');
+ const csv=[keys.map(quote).join(','),...rows.map(row=>keys.map(k=>quote(typeof row[k]==='object'?JSON.stringify(row[k]):row[k])).join(','))].join('\row\n');
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 $('exportPatientsCsv').onclick=()=>{if(!['owner','doctor'].includes(role)){alert('Only owner or doctor can export patient data.');return}if(confirm('Export confidential patient information to CSV?'))downloadCsv('clinic-patients.csv',patients)};
