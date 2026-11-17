@@ -182,7 +182,7 @@
 <div class="field"><label>Document type</label><select name="entity_type"><optgroup label="Personal identity documents"><option value="aadhaar_masked">Masked Aadhaar card (recommended)</option><option value="pan_card">PAN card</option><option value="voter_id">Voter ID</option><option value="passport">Passport</option><option value="driving_license">Driving licence</option><option value="address_proof">Other address proof</option><option value="insurance_card">Health insurance card</option><option value="other_patient_document">Other personal document</option></optgroup><optgroup label="Clinical records"><option value="patient">Patient document</option><option value="pregnancy">Pregnancy</option><option value="anc_visit">ANC visit</option><option value="investigation">Investigation</option><option value="ultrasound">Ultrasound report</option><option value="delivery">Delivery</option><option value="consent">Consent</option><option value="fertility">Fertility</option></optgroup></select></div>
 <div class="field full"><label>Choose multiple PDFs or images (up to 10 MB each) *</label><input id="attachmentFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple required><small class="muted">Select several files together. The selected document type will be applied to every file.</small><div id="attachmentFileList" class="small muted"></div></div>
 </div><button class="btn" type="submit" style="margin-top:12px">Upload all selected documents</button><div id="attachmentMsg"></div></form><p class="small muted">Files are stored in a private Supabase bucket. Only authorised clinic owner, doctor and nurse accounts can access them. Identity documents are highly sensitive: upload only when necessary, prefer masked Aadhaar (hide the first 8 digits), obtain the patient’s consent, and do not upload or retain a full Aadhaar copy unless legally required and securely justified. Do not share signed document links.</p></div>
-<div class="panel" style="margin-top:14px"><h2>Patient documents</h2><div class="field" style="max-width:420px;margin-bottom:12px"><label for="documentPatientFilter">Show documents for patient</label><select id="documentPatientFilter"><option value="">Select a patient to view documents</option></select></div><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
+<div class="panel" style="margin-top:14px"><div class="row between"><h2>Patient documents</h2><button type="button" class="btn" id="downloadPatientDocumentsPdf" disabled>Download all as PDF</button></div><div class="field" style="max-width:420px;margin-bottom:12px"><label for="documentPatientFilter">Show documents for patient</label><select id="documentPatientFilter"><option value="">Select a patient to view documents</option></select></div><div id="documentPdfMsg" class="small muted" aria-live="polite"></div><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
 <div class="panel" style="margin-top:14px"><h2>Clinic reports</h2><p class="muted">Export files contain confidential health or billing information. Save them only on an encrypted, access-controlled device.</p><div class="row">
 <button class="btn secondary" id="exportPatientsCsv">Export patient register CSV</button>
 <button class="btn secondary" id="exportAppointmentsCsv">Export appointments CSV</button>
@@ -847,12 +847,79 @@ function renderPatientDocuments(){
  const target=$('attachmentRows'),filter=$('documentPatientFilter');if(!target||!filter)return;
  const patientId=filter.value;
  if(!patientId){target.innerHTML='<tr><td colspan="5" class="empty">Select a patient above to view their documents.</td></tr>';return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId);
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+ const pdfButton=$('downloadPatientDocumentsPdf');if(pdfButton)pdfButton.disabled=!docs.length;
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
  target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
 }
 $('documentPatientFilter').addEventListener('change',renderPatientDocuments);
+async function ensurePdfLib(){
+ if(window.PDFLib)return window.PDFLib;
+ await new Promise((resolve,reject)=>{
+  const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+  script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the PDF generator. Check your internet connection and retry.'));
+  document.head.appendChild(script);
+ });
+ if(!window.PDFLib)throw new Error('PDF generator did not initialise.');
+ return window.PDFLib;
+}
+async function imageBlobToPng(bytes,mime){
+ const blob=new Blob([bytes],{type:mime||'image/jpeg'});
+ let bitmap;
+ try{bitmap=await createImageBitmap(blob)}catch(e){throw new Error('Could not decode an uploaded image ('+(mime||'unknown type')+').')}
+ const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0);bitmap.close?.();
+ const png=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+ if(!png)throw new Error('Could not convert an image for PDF.');
+ return new Uint8Array(await png.arrayBuffer());
+}
+$('downloadPatientDocumentsPdf').addEventListener('click',async()=>{
+ const patientId=$('documentPatientFilter').value;
+ const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
+ if(!patientId||!patient){alert('Select a patient first.');return}
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+ if(!docs.length){alert('No uploaded documents were found for this patient.');return}
+ const button=$('downloadPatientDocumentsPdf'),status=$('documentPdfMsg');button.disabled=true;
+ try{
+  const PDFLib=await ensurePdfLib(),pdf=await PDFLib.PDFDocument.create();
+  pdf.setTitle('Patient documents - '+(patient.full_name||patient.patient_code||'Patient'));
+  pdf.setSubject('Combined uploaded patient documents');
+  const pageWidth=595.28,pageHeight=841.89,margin=32;
+  for(let i=0;i<docs.length;i++){
+   const doc=docs[i];status.textContent='Preparing document '+(i+1)+' of '+docs.length+': '+(doc.original_filename||'uploaded file');
+   const {data:signed,error:signedError}=await db.storage.from(doc.storage_bucket||'gyn-private').createSignedUrl(doc.storage_path,120);
+   if(signedError)throw new Error('Cannot access '+(doc.original_filename||'a document')+': '+signedError.message);
+   const response=await fetch(signed.signedUrl);if(!response.ok)throw new Error('Download failed for '+(doc.original_filename||'a document')+' (HTTP '+response.status+').');
+   const bytes=new Uint8Array(await response.arrayBuffer());
+   const mime=String(doc.mime_type||response.headers.get('content-type')||'').toLowerCase();
+   const isPdf=mime.includes('pdf')||/\.pdf$/i.test(doc.original_filename||'');
+   if(isPdf){
+    const source=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:false});
+    const copied=await pdf.copyPages(source,source.getPageIndices());
+    copied.forEach(page=>pdf.addPage(page));
+   }else{
+    const isPng=mime.includes('png')||/\.png$/i.test(doc.original_filename||'');
+    const imageBytes=isPng?bytes:await imageBlobToPng(bytes,mime);
+    const image=isPng?await pdf.embedPng(imageBytes):await pdf.embedPng(imageBytes);
+    const page=pdf.addPage([pageWidth,pageHeight]);
+    const maxW=pageWidth-margin*2,maxH=pageHeight-margin*2-35;
+    const scale=Math.min(maxW/image.width,maxH/image.height,1);
+    const w=image.width*scale,h=image.height*scale;
+    page.drawText((doc.original_filename||'Uploaded image').slice(0,100),{x:margin,y:pageHeight-margin-12,size:9,color:PDFLib.rgb(.25,.32,.31)});
+    page.drawImage(image,{x:(pageWidth-w)/2,y:(pageHeight-h)/2-10,width:w,height:h});
+   }
+  }
+  if(!pdf.getPageCount())throw new Error('No pages were generated.');
+  const out=await pdf.save(),blob=new Blob([out],{type:'application/pdf'}),url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  const safe=(patient.full_name||patient.patient_code||'patient').replace(/[^a-z0-9_-]+/gi,'_').slice(0,70);
+  a.download=safe+'_all_documents.pdf';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  status.textContent='Combined PDF created: '+docs.length+' uploaded file(s), '+pdf.getPageCount()+' page(s).';
+ }catch(error){status.textContent='PDF creation failed: '+(error.message||String(error));alert(status.textContent)}
+ finally{button.disabled=false}
+});
 $('attachmentRows').addEventListener('click',async e=>{
  const renameBtn=e.target.closest('[data-rename-attachment]');
  if(renameBtn){
