@@ -182,7 +182,7 @@
 <div class="field"><label>Document type</label><select name="entity_type"><optgroup label="Personal identity documents"><option value="aadhaar_masked">Masked Aadhaar card (recommended)</option><option value="pan_card">PAN card</option><option value="voter_id">Voter ID</option><option value="passport">Passport</option><option value="driving_license">Driving licence</option><option value="address_proof">Other address proof</option><option value="insurance_card">Health insurance card</option><option value="other_patient_document">Other personal document</option></optgroup><optgroup label="Clinical records"><option value="patient">Patient document</option><option value="pregnancy">Pregnancy</option><option value="anc_visit">ANC visit</option><option value="investigation">Investigation</option><option value="ultrasound">Ultrasound report</option><option value="delivery">Delivery</option><option value="consent">Consent</option><option value="fertility">Fertility</option></optgroup></select></div>
 <div class="field full"><label>Choose multiple PDFs or images (up to 10 MB each) *</label><input id="attachmentFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple required><small class="muted">Select several files together. The selected document type will be applied to every file.</small><div id="attachmentFileList" class="small muted"></div></div>
 </div><button class="btn" type="submit" style="margin-top:12px">Upload all selected documents</button><div id="attachmentMsg"></div></form><p class="small muted">Files are stored in a private Supabase bucket. Only authorised clinic owner, doctor and nurse accounts can access them. Identity documents are highly sensitive: upload only when necessary, prefer masked Aadhaar (hide the first 8 digits), obtain the patient’s consent, and do not upload or retain a full Aadhaar copy unless legally required and securely justified. Do not share signed document links.</p></div>
-<div class="panel" style="margin-top:14px"><h2>Patient documents</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
+<div class="panel" style="margin-top:14px"><h2>Patient documents</h2><div class="field" style="max-width:420px;margin-bottom:12px"><label for="documentPatientFilter">Show documents for patient</label><select id="documentPatientFilter"><option value="">Select a patient to view documents</option></select></div><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
 <div class="panel" style="margin-top:14px"><h2>Clinic reports</h2><p class="muted">Export files contain confidential health or billing information. Save them only on an encrypted, access-controlled device.</p><div class="row">
 <button class="btn secondary" id="exportPatientsCsv">Export patient register CSV</button>
 <button class="btn secondary" id="exportAppointmentsCsv">Export appointments CSV</button>
@@ -672,10 +672,14 @@ function renderModuleLists(){
  renderSafeTable('inventoryRows',moduleData.gyn_inventory_items,['item_name','batch_number','expiry_date','quantity','reorder_level']);
  renderSafeTable('theatreRows',moduleData.gyn_theatre_cases,['patient_id','procedure_name','planned_at','procedure_status','consent_verified']);
  const attachmentTarget=$('attachmentRows');
- if(attachmentTarget){
-  const documents=Array.isArray(moduleData.gyn_attachments)?moduleData.gyn_attachments:[];
-  attachmentTarget.innerHTML=documents.length?documents.map(documentRecord=>'<tr><td>'+esc(documentRecord.patient_id||'—')+'</td><td>'+esc(documentRecord.original_filename||'—')+'</td><td>'+esc(documentRecord.entity_type||'—')+'</td><td>'+esc(isoLocal(documentRecord.created_at))+'</td><td><button class="btn secondary" data-attachment="'+esc(documentRecord.id)+'">Open</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents uploaded.</td></tr>';
+ const filter=$('documentPatientFilter');
+ if(filter){
+  const patients=Array.isArray(moduleData.gyn_patients)?moduleData.gyn_patients:[];
+  const selected=filter.value;
+  filter.innerHTML='<option value="">Select a patient to view documents</option>'+patients.map(p=>'<option value="'+esc(p.id)+'">'+esc([p.patient_name||p.full_name||p.name||'Patient',p.patient_code||''].filter(Boolean).join(' · '))+'</option>').join('');
+  if(patients.some(p=>p.id===selected))filter.value=selected;
  }
+ if(attachmentTarget)renderPatientDocuments();
 }
 const loadAllBeforeModules=loadAll;
 loadAll=async function(){await loadAllBeforeModules();const [d]=await Promise.all([db.from('gyn_deliveries').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)]);if(d.error)throw d.error;moduleData.gyn_deliveries=d.data||[];await loadModuleLists()};
@@ -810,9 +814,32 @@ $('restoreBtn').addEventListener('click',async()=>{
  msg('restoreMsg','Restore completed. '+total+' new records imported; existing IDs were skipped.');
  await loadAll();
 });
+function renderPatientDocuments(){
+ const target=$('attachmentRows'),filter=$('documentPatientFilter');if(!target||!filter)return;
+ const patientId=filter.value;
+ if(!patientId){target.innerHTML='<tr><td colspan="5" class="empty">Select a patient above to view their documents.</td></tr>';return}
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId);
+ const patient=(moduleData.gyn_patients||[]).find(p=>p.id===patientId);
+ const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
+ target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
+}
+$('documentPatientFilter').addEventListener('change',renderPatientDocuments);
 $('attachmentRows').addEventListener('click',async e=>{
- const id=e.target.dataset.attachment;if(!id)return;
- const item=(moduleData.gyn_attachments||[]).find(x=>x.id===id);if(!item)return;
+ const renameBtn=e.target.closest('[data-rename-attachment]');
+ if(renameBtn){
+  const item=(moduleData.gyn_attachments||[]).find(x=>x.id===renameBtn.dataset.renameAttachment);if(!item)return;
+  const next=prompt('Enter a clear document name:',item.original_filename||'');if(next===null)return;
+  const name=next.trim();if(!name){alert('Document name cannot be empty.');return}
+  if(name.length>180){alert('Document name must be 180 characters or fewer.');return}
+  renameBtn.disabled=true;
+  const {data,error}=await db.from('gyn_attachments').update({original_filename:name}).eq('id',item.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
+  renameBtn.disabled=false;
+  if(error){alert('Could not rename document: '+error.message);return}
+  if(!data){alert('No document was updated. Check your clinic permissions and try again.');return}
+  item.original_filename=name;renderPatientDocuments();return;
+ }
+ const openBtn=e.target.closest('[data-attachment]');if(!openBtn)return;
+ const item=(moduleData.gyn_attachments||[]).find(x=>x.id===openBtn.dataset.attachment);if(!item)return;
  const {data,error}=await db.storage.from(item.storage_bucket).createSignedUrl(item.storage_path,60);
  if(error){alert(error.message);return}window.open(data.signedUrl,'_blank','noopener');
 });
