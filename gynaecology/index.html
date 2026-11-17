@@ -674,10 +674,10 @@ function renderModuleLists(){
  const attachmentTarget=$('attachmentRows');
  const filter=$('documentPatientFilter');
  if(filter){
-  const patients=Array.isArray(moduleData.gyn_patients)?moduleData.gyn_patients:[];
+  const patientList=Array.isArray(patients)?patients:[];
   const selected=filter.value;
-  filter.innerHTML='<option value="">Select a patient to view documents</option>'+patients.map(p=>'<option value="'+esc(p.id)+'">'+esc([p.patient_name||p.full_name||p.name||'Patient',p.patient_code||''].filter(Boolean).join(' · '))+'</option>').join('');
-  if(patients.some(p=>p.id===selected))filter.value=selected;
+  filter.innerHTML='<option value="">Select a patient to view documents</option>'+patientList.map(p=>'<option value="'+esc(p.id)+'">'+esc([p.patient_name||p.full_name||p.name||'Patient',p.patient_code||''].filter(Boolean).join(' · '))+'</option>').join('');
+  if(patientList.some(p=>p.id===selected))filter.value=selected;
  }
  if(attachmentTarget)renderPatientDocuments();
 }
