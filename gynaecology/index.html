@@ -681,8 +681,37 @@ function renderModuleLists(){
  }
  if(attachmentTarget)renderPatientDocuments();
 }
+let documentPatients=[];
+async function refreshPatientDocumentPanel(){
+ const filter=$('documentPatientFilter'),target=$('attachmentRows');
+ if(!filter||!clinic)return;
+ const selected=filter.value;
+ const patientResult=await db.from('gyn_patients').select('id,patient_code,full_name').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false});
+ if(patientResult.error){
+  filter.innerHTML='<option value="">Could not load patients — '+esc(patientResult.error.message)+'</option>';
+  if(target)target.innerHTML='<tr><td colspan="5" class="empty">Patient list could not be loaded. Check clinic access.</td></tr>';
+  return;
+ }
+ documentPatients=patientResult.data||[];
+ filter.innerHTML='<option value="">'+(documentPatients.length?'Select a patient to view documents':'No active patients found in this clinic')+'</option>'+documentPatients.map(p=>'<option value="'+esc(p.id)+'">'+esc([p.full_name||'Patient',p.patient_code||''].filter(Boolean).join(' · '))+'</option>').join('');
+ if(documentPatients.some(p=>p.id===selected))filter.value=selected;
+ const docsResult=await db.from('gyn_attachments').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(300);
+ if(docsResult.error){
+  if(target)target.innerHTML='<tr><td colspan="5" class="empty">Patient list loaded, but documents could not be loaded: '+esc(docsResult.error.message)+'</td></tr>';
+  return;
+ }
+ moduleData.gyn_attachments=docsResult.data||[];
+ renderPatientDocuments();
+}
 const loadAllBeforeModules=loadAll;
-loadAll=async function(){await loadAllBeforeModules();const [d]=await Promise.all([db.from('gyn_deliveries').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200)]);if(d.error)throw d.error;moduleData.gyn_deliveries=d.data||[];await loadModuleLists()};
+loadAll=async function(){
+ try{await loadAllBeforeModules()}
+ finally{await refreshPatientDocumentPanel()}
+ const d=await db.from('gyn_deliveries').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(200);
+ if(d.error)throw d.error;
+ moduleData.gyn_deliveries=d.data||[];
+ try{await loadModuleLists()}finally{await refreshPatientDocumentPanel()}
+};
 function bindModuleForm(id,table,numberFields=[],dateTimeFields=[]){
  const form=$(id);if(!form)return;
  form.addEventListener('submit',async e=>{
@@ -819,7 +848,7 @@ function renderPatientDocuments(){
  const patientId=filter.value;
  if(!patientId){target.innerHTML='<tr><td colspan="5" class="empty">Select a patient above to view their documents.</td></tr>';return}
  const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId);
- const patient=(moduleData.gyn_patients||[]).find(p=>p.id===patientId);
+ const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
  target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
 }
