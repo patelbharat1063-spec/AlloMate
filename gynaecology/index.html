@@ -182,7 +182,7 @@
 <div class="panel" style="margin-top:14px;border:2px solid #176b5b" id="patientOcrPanel">
 <h2>Extract & organise patient reports / દસ્તાવેજોમાંથી માહિતી મેળવો</h2>
 <p class="muted">Select a patient above, choose clinical report images or PDFs, then extract the text into a structured, patient-wise review sheet.</p>
-<div id="ocrDocumentChoices" class="small muted" style="max-height:260px;overflow:auto;border:1px solid #d8e4e1;border-radius:10px;padding:10px">Select a patient to list clinical documents.</div>
+<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0"><button type="button" class="btn secondary" id="refreshOcrDocuments">Refresh OCR document list</button><span id="ocrLoadStatus" class="small muted" aria-live="polite">Select a patient to load documents.</span></div><div id="ocrDocumentChoices" class="small muted" style="max-height:320px;overflow:auto;border:1px solid #d8e4e1;border-radius:10px;padding:10px">Select a patient to list clinical documents.</div>
 <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
 <button type="button" class="btn secondary" id="ocrSelectAll">Select all clinical reports</button>
 <button type="button" class="btn" id="runPatientOcr">Extract selected documents</button>
@@ -881,7 +881,7 @@ function renderPatientDocuments(){
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
  target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-move-attachment="up" data-id="'+esc(d.id)+'">↑</button> <button type="button" class="btn secondary" data-move-attachment="down" data-id="'+esc(d.id)+'">↓</button> <button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button> <button type="button" class="btn danger" data-delete-attachment="'+esc(d.id)+'">Delete</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
- renderOcrDocuments();
+ refreshOcrDocuments();
 }
 $('documentPatientFilter').addEventListener('change',renderPatientDocuments);
 async function ensurePdfLib(){
@@ -1004,6 +1004,28 @@ $('attachmentRows').addEventListener('click',async e=>{
 
 // Patient document OCR: browser-side processing of files downloaded through the authenticated Supabase client.
 function isIdentityAttachment(d){return ['aadhaar_masked','pan_card','voter_id','passport','driving_license','address_proof','insurance_card','other_patient_document'].includes(String(d.entity_type||'').toLowerCase())}
+async function refreshOcrDocuments(){
+ const host=$('ocrDocumentChoices'),status=$('ocrLoadStatus'),patientId=$('documentPatientFilter')?.value;
+ if(!host)return;
+ if(!patientId){host.textContent='Select a patient to list clinical documents.';if(status)status.textContent='No patient selected.';return}
+ if(status)status.textContent='Loading this patient’s documents directly from the secure database…';
+ host.textContent='Loading documents…';
+ try{
+  const result=await db.from('gyn_attachments').select('*').eq('clinic_id',clinic.id).eq('patient_id',patientId).order('created_at',{ascending:false});
+  if(result.error)throw result.error;
+  const rows=result.data||[];
+  const others=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id!==patientId);
+  moduleData.gyn_attachments=others.concat(rows);
+  renderOcrDocuments();
+  const supported=rows.filter(d=>{const m=String(d.mime_type||'').toLowerCase(),n=String(d.original_filename||'');return m.startsWith('image/')||m.includes('pdf')||/\.pdf$/i.test(n)}).length;
+  if(status)status.textContent=rows.length+' document record(s) found for this patient · '+supported+' PDF/image file(s) supported for OCR.';
+  if(!rows.length)host.innerHTML='<span class="muted">No attachment records are linked to this patient in the database. If the files appear in storage only, they must first have an attachment record.</span>';
+ }catch(error){
+  host.innerHTML='<span style="color:#b42318">Could not load OCR documents: '+esc(error.message||String(error))+'</span>';
+  if(status)status.textContent='Document loading failed. Check your signed-in access and try refresh.';
+ }
+}
+$('refreshOcrDocuments')?.addEventListener('click',refreshOcrDocuments);
 function renderOcrDocuments(){
  const host=$('ocrDocumentChoices'),patientId=$('documentPatientFilter')?.value;
  if(!host)return;
