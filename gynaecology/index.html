@@ -181,7 +181,7 @@
 </div>
 <div class="panel" style="margin-top:14px;border:2px solid #176b5b" id="patientOcrPanel">
 <h2>Extract & organise patient reports / દસ્તાવેજોમાંથી માહિતી મેળવો</h2>
-<p class="muted">Select a patient above, choose clinical report images or PDFs, then extract the text into a structured, patient-wise review sheet.</p>
+<p class="muted">Accuracy safeguard: OCR text is preserved verbatim without spelling correction, number conversion, rounding or automatic clinical interpretation. The index is only a search aid. Always compare with the original; nothing is saved to patient records automatically.</p>
 <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0"><button type="button" class="btn secondary" id="refreshOcrDocuments">Refresh OCR document list</button><span id="ocrLoadStatus" class="small muted" aria-live="polite">Select a patient to load documents.</span></div><div id="ocrDocumentChoices" class="small muted" style="max-height:320px;overflow:auto;border:1px solid #d8e4e1;border-radius:10px;padding:10px">Select a patient to list clinical documents.</div>
 <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
 <button type="button" class="btn secondary" id="ocrSelectAll">Select all clinical reports</button>
@@ -1082,20 +1082,19 @@ function classifyOcrDoc(d){
  return 'Other clinical documents';
 }
 function formatDocumentContent(x){
- const lines=String(x.text||'').split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+ const raw=String(x.text??'');
+ const lines=raw.split(/\r?\n/);
  let out='DOCUMENT: '+x.name+'\nUploaded: '+x.date+' | Type: '+x.type+'\n';
+ out+='OCR confidence: '+(Number.isFinite(Number(x.confidence))?Number(x.confidence).toFixed(1)+'%':'Not supplied')+' · '+(Number(x.confidence)<80?'LOW CONFIDENCE — CHECK ORIGINAL':'Not a guarantee of accuracy')+'\n';
+ out+='\nSOURCE OCR TEXT — VERBATIM, UNEDITED\n-----------------------------------\n'+(raw||'[No readable text detected]')+'\n';
+ out+='\nAUTOMATIC FINDING INDEX — SEARCH AID ONLY; NOT CORRECTED OR VERIFIED\n';
  const groups=[
-  ['Ultrasound measurements and findings',/\b(CRL|FHR|GS|MGS|EDD|LMP|GA|NT|BPD|HC|AC|FL|yolk sac|cardiac activity|placenta|scar|impression|conclusion)\b/i],
-  ['Laboratory parameters',/\b(Hb|haemoglobin|hemoglobin|RBC|WBC|TLC|platelet|MCV|MCH|MCHC|PCV|HCT|TSH|glucose|RBS|FBS|urine|albumin|HIV|HBsAg|reference range)\b/i],
-  ['Prescription and dosage lines',/\b(tablet|tab|capsule|cap|syrup|injection|inj|mg|mcg|ml|OD|BD|TDS|QDS|HS|daily|twice|after food|before food)\b/i],
-  ['Other clinical observations',/\b(BP|blood pressure|pulse|SpO2|weight|height|BMI|temperature|diagnosis|advice|follow.?up)\b/i]
+ ['Ultrasound measurements and findings',/\b(CRL|FHR|GS|MGS|EDD|LMP|GA|NT|BPD|HC|AC|FL|yolk sac|cardiac activity|placenta|scar|impression|conclusion)\b/i],
+ ['Laboratory parameters',/\b(Hb|haemoglobin|hemoglobin|RBC|WBC|TLC|platelet|MCV|MCH|MCHC|PCV|HCT|TSH|glucose|RBS|FBS|urine|albumin|HIV|HBsAg|reference range)\b/i],
+ ['Prescription and dosage lines',/\b(tablet|tab|capsule|cap|syrup|injection|inj|mg|mcg|ml|OD|BD|TDS|QDS|HS|daily|twice|after food|before food)\b/i],
+ ['Other clinical observations',/\b(BP|blood pressure|pulse|SpO2|weight|height|BMI|temperature|diagnosis|advice|follow.?up)\b/i]
  ];
- for(const [heading,re] of groups){
-  const matches=lines.filter(line=>re.test(line));
-  if(matches.length){out+='\n'+heading.toUpperCase()+'\n';matches.forEach(line=>out+='• '+line+'\n');}
- }
- out+='\nFULL OCR TEXT — SOURCE TRANSCRIPTION\n';
- out+=(lines.join('\n')||'[No readable text detected]')+'\n';
+ for(const [heading,re] of groups){const matches=lines.filter(line=>re.test(line));if(matches.length){out+='\n'+heading.toUpperCase()+'\n';matches.forEach(line=>out+='• '+line+'\n');}}
  return out;
 }
 function buildOcrReport(patient,items){
@@ -1104,7 +1103,7 @@ function buildOcrReport(patient,items){
  let out='PATIENT DOCUMENT EXTRACTION — ORGANISED CLINICAL REVIEW\n';
  out+='======================================================\n';
  out+='Patient: '+name+'\nPatient code: '+(patient?.patient_code||'Not available')+'\nGenerated: '+new Date().toLocaleString()+'\nDocuments processed: '+items.length+'\n';
- out+='\nIMPORTANT: This is OCR transcription and automatic line grouping, not validated clinical interpretation. Verify all values, decimals, units, dates and medicine doses against each original document.\n';
+ out+='\nIMPORTANT: This is OCR transcription and automatic line grouping, source OCR text is preserved verbatim without auto-correction. The index is only a search aid. OCR can still misread digits, decimals, signs, units and medicine names. Nothing is saved automatically; verify against the original document.\n';
  for(const [category,docs] of Object.entries(groups)){
   out+='\n\n'+category.toUpperCase()+'\n'+'='.repeat(category.length)+'\n';
   docs.forEach((x,i)=>out+='\n'+(i+1)+'. '+formatDocumentContent(x)+'\n'+'-'.repeat(48)+'\n');
@@ -1147,7 +1146,7 @@ $('runPatientOcr').addEventListener('click',async()=>{
     const download=await ocrWithTimeout(db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path),45000,'Secure download');
     if(download.error)throw new Error(download.error.message||'Download failed');
     const blob=download.data;if(!blob)throw new Error('No file data returned');
-    let textValue='';
+    let textValue='';\n    let ocrConfidenceSum={total:0,count:0};
     const isPdf=mime.includes('pdf')||/\.pdf$/i.test(name);
     if(isPdf){
      const bytes=new Uint8Array(await blob.arrayBuffer());
@@ -1160,7 +1159,7 @@ $('runPatientOcr').addEventListener('click',async()=>{
       try{
        await ocrWithTimeout(page.render({canvasContext:canvas.getContext('2d'),viewport}).promise,30000,'PDF page render');
        const recognised=await ocrWithTimeout(worker.recognize(canvas),60000,'OCR page '+p);
-       textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';
+       textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';\n      if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total+=Number(recognised.data.confidence);ocrConfidenceSum.count++;}
       }finally{canvas.width=canvas.height=1;page.cleanup?.()}
      }
      if(pdf.numPages>pageLimit)textValue+='\n[Only first '+pageLimit+' pages processed; document has '+pdf.numPages+' pages.]\n';
@@ -1172,10 +1171,10 @@ $('runPatientOcr').addEventListener('click',async()=>{
      try{
       canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
       const recognised=await ocrWithTimeout(worker.recognize(canvas),75000,'Image OCR');
-      textValue=recognised.data.text||'';
+      textValue=recognised.data.text||'';\n      if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total=Number(recognised.data.confidence);ocrConfidenceSum.count=1;}
      }finally{bitmap.close?.();canvas.width=canvas.height=1}
     }else throw new Error('Unsupported file format: '+mime);
-    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue});
+    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue,confidence:ocrConfidenceSum.count?ocrConfidenceSum.total/ocrConfidenceSum.count:null});
    }catch(docErr){
     failures.push({name,error:docErr.message||String(docErr)});
     results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:'[EXTRACTION FAILED: '+(docErr.message||String(docErr))+']'});
