@@ -815,7 +815,10 @@ $('attachmentForm').addEventListener('submit',async e=>{
    uploaded.push({file,contentType,path});
    msg('attachmentMsg','Uploaded '+uploaded.length+' of '+prepared.length+' document(s)…');
   }
-  const rows=uploaded.map(x=>({clinic_id:clinic.id,patient_id:patientId,entity_type:entityType,storage_bucket:'gyn-private',storage_path:x.path,original_filename:x.file.name,mime_type:x.contentType,size_bytes:x.file.size,uploaded_by:user.id}));
+  const {data:tailRows,error:tailError}=await db.from('gyn_attachments').select('sort_order').eq('clinic_id',clinic.id).eq('patient_id',patientId).order('sort_order',{ascending:false}).limit(1);
+  if(tailError)throw new Error('Could not determine the next document position: '+tailError.message);
+  const firstPosition=(Number(tailRows?.[0]?.sort_order)||0)+(tailRows?.length?1:0);
+  const rows=uploaded.map((x,i)=>({clinic_id:clinic.id,patient_id:patientId,entity_type:entityType,storage_bucket:'gyn-private',storage_path:x.path,original_filename:x.file.name,mime_type:x.contentType,size_bytes:x.file.size,uploaded_by:user.id,sort_order:firstPosition+i}));
   const {error:rowError}=await db.from('gyn_attachments').insert(rows);
   if(rowError)throw new Error('Files uploaded but attachment records could not be saved: '+rowError.message);
   const audit=await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'documents_uploaded',entity_type:'gyn_attachments',details:{patient_id:patientId,count:uploaded.length,files:uploaded.map(x=>x.file.name)}});
@@ -849,11 +852,11 @@ function renderPatientDocuments(){
  const target=$('attachmentRows'),filter=$('documentPatientFilter');if(!target||!filter)return;
  const patientId=filter.value;
  if(!patientId){target.innerHTML='<tr><td colspan="5" class="empty">Select a patient above to view their documents.</td></tr>';return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
  const pdfButton=$('downloadPatientDocumentsPdf');if(pdfButton)pdfButton.disabled=!docs.length;
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
- target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button> <button type="button" class="btn danger" data-delete-attachment="'+esc(d.id)+'">Delete</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
+ target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-move-attachment="up" data-id="'+esc(d.id)+'">↑</button> <button type="button" class="btn secondary" data-move-attachment="down" data-id="'+esc(d.id)+'">↓</button> <button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button> <button type="button" class="btn danger" data-delete-attachment="'+esc(d.id)+'">Delete</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
 }
 $('documentPatientFilter').addEventListener('change',renderPatientDocuments);
 async function ensurePdfLib(){
@@ -880,7 +883,7 @@ $('downloadPatientDocumentsPdf').addEventListener('click',async()=>{
  const patientId=$('documentPatientFilter').value;
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  if(!patientId||!patient){alert('Select a patient first.');return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
  if(!docs.length){alert('No uploaded documents were found for this patient.');return}
  const button=$('downloadPatientDocumentsPdf'),status=$('documentPdfMsg');button.disabled=true;
  try{
@@ -935,6 +938,24 @@ $('attachmentRows').addEventListener('click',async e=>{
   if(error){alert('Could not rename document: '+error.message);return}
   if(!data){alert('No document was updated. Check your clinic permissions and try again.');return}
   item.original_filename=name;renderPatientDocuments();return;
+ }
+ const moveBtn=e.target.closest('[data-move-attachment]');
+ if(moveBtn){
+  const docs=(moduleData.gyn_attachments||[]).filter(x=>x.patient_id===$('documentPatientFilter').value).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
+  const index=docs.findIndex(x=>x.id===moveBtn.dataset.id),step=moveBtn.dataset.moveAttachment==='up'?-1:1,other=docs[index+step];
+  if(index<0||!other)return;
+  const current=docs[index],currentOrder=Number(current.sort_order)||0,otherOrder=Number(other.sort_order)||0;
+  moveBtn.disabled=true;
+  const first=await db.from('gyn_attachments').update({sort_order:currentOrder}).eq('id',other.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
+  if(first.error||!first.data){moveBtn.disabled=false;alert('Could not change document order: '+(first.error?.message||'No document was updated.'));return}
+  const second=await db.from('gyn_attachments').update({sort_order:otherOrder}).eq('id',current.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
+  if(second.error||!second.data){
+   await db.from('gyn_attachments').update({sort_order:otherOrder}).eq('id',other.id).eq('clinic_id',clinic.id);
+   moveBtn.disabled=false;alert('Order change was not completed: '+(second.error?.message||'No document was updated.'));return;
+  }
+  other.sort_order=currentOrder;current.sort_order=otherOrder;
+  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_order_changed',entity_type:'gyn_attachments',details:{patient_id:current.patient_id,moved_document_id:current.id,direction:step<0?'up':'down'}});
+  renderPatientDocuments();return;
  }
  const deleteBtn=e.target.closest('[data-delete-attachment]');
  if(deleteBtn){
