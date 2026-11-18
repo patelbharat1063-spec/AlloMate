@@ -178,7 +178,7 @@
 <section id="theatre" class="section"><div class="panel"><h2>Operation theatre & procedure schedule</h2><p class="small muted">Scheduling and documentation only. Clinical suitability, anaesthesia, consent and procedure decisions remain with the responsible clinical team.</p><form id="theatreForm"><div class="fields"><div class="field"><label>Patient *</label><select id="theatrePatient" name="patient_id" required></select></div><div class="field"><label>Procedure *</label><input name="procedure_name" required placeholder="Procedure / surgery name"></div><div class="field"><label>Planned date & time *</label><input name="planned_at" type="datetime-local" required></div><div class="field"><label>Status</label><select name="procedure_status"><option value="planned">Planned</option><option value="preparation">Preparation</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div><div class="field full"><label>Anaesthesia plan (clinician-entered)</label><textarea name="anaesthesia_plan"></textarea></div><div class="field full"><label>Pre-operative notes</label><textarea name="pre_op_notes"></textarea></div><div class="field full"><label>Post-operative notes</label><textarea name="post_op_notes"></textarea></div></div><button class="btn" style="margin-top:12px">Save procedure record</button><div id="theatreMsg"></div></form></div><div class="panel" style="margin-top:14px"><h2>Scheduled & completed procedures</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Procedure</th><th>Planned at</th><th>Status</th><th>Consent verified</th></tr></thead><tbody id="theatreRows"></tbody></table></div></div></section>
 <section id="reports" class="section">
 <div class="panel" style="margin-top:14px;border:2px solid #176b5b"><h2>Download patient documents as one PDF</h2><p class="muted">First select a patient. This button combines every uploaded PDF and image for that patient into one file.</p><div class="field" style="max-width:480px;margin-bottom:12px"><label for="documentPatientFilter">Select patient / દર્દી પસંદ કરો</label><select id="documentPatientFilter"><option value="">Select a patient to view documents</option></select></div><button type="button" class="btn" id="downloadPatientDocumentsPdf" disabled style="width:100%;min-height:48px;font-size:16px">Download all patient documents as PDF</button><div id="documentPdfMsg" class="small muted" aria-live="polite"></div></div>
-<div class="panel" style="margin-top:14px;border:2px solid #176b5b"><h2>Extract data from patient uploads / દસ્તાવેજમાંથી માહિતી મેળવો</h2><p class="muted">Choose one or more uploaded image reports. OCR runs in this browser; files remain in your private Supabase bucket. Extracted text is a draft only and is never saved automatically.</p><div id="extractDocumentChoices" class="small muted">Select a patient above to list uploaded documents.</div><div class="row" style="gap:10px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn secondary" id="selectAllExtractDocs">Select all reports</button><button type="button" class="btn" id="extractPatientDocs" disabled>Extract selected documents</button></div><div id="extractProgress" class="small muted" aria-live="polite" style="margin-top:8px"></div><label for="extractedPatientText" style="display:block;margin-top:12px">Extracted text — review and correct before entering into patient records</label><textarea id="extractedPatientText" rows="12" style="width:100%;font-family:monospace" placeholder="Extracted report text will appear here…"></textarea><div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn secondary" id="copyExtractedPatientText">Copy extracted text</button><span class="small muted">OCR may misread numbers, dates, units and handwriting. Verify against each original report.</span></div></div>
+</div>
 <div class="panel" style="margin-top:14px"><h2>Patient documents list</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
 <div class="panel"><h2>Secure patient document upload</h2><form id="attachmentForm"><div class="fields">
 <div class="field"><label>Patient *</label><select name="patient_id" id="attachmentPatient" required></select></div>
@@ -854,12 +854,6 @@ function renderPatientDocuments(){
  const patientId=filter.value;
  if(!patientId){target.innerHTML='<tr><td colspan="5" class="empty">Select a patient above to view their documents.</td></tr>';return}
  const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
- const extractBox=$('extractDocumentChoices'),extractBtn=$('extractPatientDocs');
- if(extractBox){
-  extractBox.innerHTML=docs.length?docs.map(d=>'<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #e5ece9"><input type="checkbox" class="extract-doc-check" value="'+esc(d.id)+'" '+(d.mime_type&&d.mime_type.startsWith('image/')?'':'disabled')+'> <span>'+esc(d.original_filename||'Uploaded document')+' <span class="muted">('+esc(d.mime_type||'unknown type')+')</span></span></label>').join(''):'No uploaded documents for this patient.';
- }
- if(extractBtn)extractBtn.disabled=!docs.some(d=>d.mime_type&&d.mime_type.startsWith('image/'));
-
  const pdfButton=$('downloadPatientDocumentsPdf');if(pdfButton)pdfButton.disabled=!docs.length;
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
@@ -1003,46 +997,7 @@ $('movementForm').addEventListener('submit',async e=>{
 });
 
 
-async function loadTesseractForPatientOCR(){
- if(window.Tesseract)return window.Tesseract;
- await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Could not load the OCR engine. Check internet access and retry.'));document.head.appendChild(s)});
- if(!window.Tesseract)throw new Error('OCR engine did not initialise.');
- return window.Tesseract;
-}
-$('selectAllExtractDocs')?.addEventListener('click',()=>{
- document.querySelectorAll('.extract-doc-check:not(:disabled)').forEach(x=>x.checked=true);
-});
-$('extractPatientDocs')?.addEventListener('click',async()=>{
- const patientId=$('documentPatientFilter')?.value;
- const ids=[...document.querySelectorAll('.extract-doc-check:checked')].map(x=>x.value);
- if(!patientId){msg('extractProgress','Select a patient first.',true);return}
- if(!ids.length){msg('extractProgress','Select at least one image report.',true);return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>ids.includes(d.id)&&d.patient_id===patientId&&d.mime_type?.startsWith('image/'));
- const btn=$('extractPatientDocs');btn.disabled=true;
- const output=$('extractedPatientText');output.value='';
- let worker=null,completed=0;
- try{
-  const T=await loadTesseractForPatientOCR();
-  worker=await T.createWorker('eng');
-  for(const d of docs){
-   msg('extractProgress','Downloading securely: '+(d.original_filename||'document')+' ('+(completed+1)+'/'+docs.length+')');
-   const {data:blob,error}=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);
-   if(error)throw new Error('Could not download '+(d.original_filename||'document')+': '+error.message);
-   msg('extractProgress','Reading image: '+(d.original_filename||'document')+' ('+(completed+1)+'/'+docs.length+')');
-   const result=await worker.recognize(blob);
-   output.value+='\n\n========== '+(d.original_filename||'Uploaded image')+' | '+new Date(d.created_at).toLocaleDateString('en-IN')+' ==========\n'+(result.data.text||'[No readable text detected]')+'\n';
-   completed++;
-  }
-  msg('extractProgress','Finished OCR for '+completed+' image(s). Review all extracted values against the originals. Nothing has been saved to the database.');
- }catch(err){msg('extractProgress','Extraction stopped: '+err.message,true)}
- finally{if(worker)try{await worker.terminate()}catch(e){}btn.disabled=false}
-});
-$('copyExtractedPatientText')?.addEventListener('click',async()=>{
- const text=$('extractedPatientText')?.value||'';
- if(!text){msg('extractProgress','There is no extracted text to copy.',true);return}
- try{await navigator.clipboard.writeText(text);msg('extractProgress','Extracted text copied.')}
- catch(e){$('extractedPatientText').select();msg('extractProgress','Select and copy the text manually.')}
-});
+
 
 
 boot();
