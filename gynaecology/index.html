@@ -941,20 +941,15 @@ $('attachmentRows').addEventListener('click',async e=>{
  }
  const moveBtn=e.target.closest('[data-move-attachment]');
  if(moveBtn){
-  const docs=(moduleData.gyn_attachments||[]).filter(x=>x.patient_id===$('documentPatientFilter').value).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
-  const index=docs.findIndex(x=>x.id===moveBtn.dataset.id),step=moveBtn.dataset.moveAttachment==='up'?-1:1,other=docs[index+step];
-  if(index<0||!other)return;
-  const current=docs[index],currentOrder=Number(current.sort_order)||0,otherOrder=Number(other.sort_order)||0;
+  const direction=moveBtn.dataset.moveAttachment;
+  const attachmentId=moveBtn.dataset.id;
   moveBtn.disabled=true;
-  const first=await db.from('gyn_attachments').update({sort_order:currentOrder}).eq('id',other.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
-  if(first.error||!first.data){moveBtn.disabled=false;alert('Could not change document order: '+(first.error?.message||'No document was updated.'));return}
-  const second=await db.from('gyn_attachments').update({sort_order:otherOrder}).eq('id',current.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
-  if(second.error||!second.data){
-   await db.from('gyn_attachments').update({sort_order:otherOrder}).eq('id',other.id).eq('clinic_id',clinic.id);
-   moveBtn.disabled=false;alert('Order change was not completed: '+(second.error?.message||'No document was updated.'));return;
-  }
-  other.sort_order=currentOrder;current.sort_order=otherOrder;
-  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_order_changed',entity_type:'gyn_attachments',details:{patient_id:current.patient_id,moved_document_id:current.id,direction:step<0?'up':'down'}});
+  const {data,error}=await db.rpc('gyn_move_attachment',{p_attachment_id:attachmentId,p_direction:direction});
+  if(error){moveBtn.disabled=false;alert('Could not change document order: '+error.message);return}
+  const {data:latest,error:refreshError}=await db.from('gyn_attachments').select('*').eq('clinic_id',clinic.id).order('sort_order',{ascending:true}).limit(300);
+  if(refreshError){alert('Order was saved, but the list could not refresh: '+refreshError.message);return}
+  moduleData.gyn_attachments=latest||[];
+  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_order_changed',entity_type:'gyn_attachments',details:{attachment_id:attachmentId,direction}});
   renderPatientDocuments();return;
  }
  const deleteBtn=e.target.closest('[data-delete-attachment]');
