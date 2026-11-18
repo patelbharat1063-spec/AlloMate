@@ -1109,7 +1109,7 @@ $('runPatientOcr').addEventListener('click',async()=>{
   const hasPdf=docs.some(d=>String(d.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(d.original_filename||''));
   if(hasImages)await loadOcrLibrary('image');
   if(hasPdf)await loadOcrLibrary('pdf');
-  if(hasImages)worker=await createPatientOcrWorker();
+  if(hasImages||hasPdf)worker=await createPatientOcrWorker();
   for(let i=0;i<docs.length;i++){
    const d=docs[i],name=d.original_filename||'Uploaded document',mime=String(d.mime_type||'').toLowerCase();
    status.textContent='Processing '+(i+1)+' of '+docs.length+': '+name;
