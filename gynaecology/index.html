@@ -1146,7 +1146,8 @@ $('runPatientOcr').addEventListener('click',async()=>{
     const download=await ocrWithTimeout(db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path),45000,'Secure download');
     if(download.error)throw new Error(download.error.message||'Download failed');
     const blob=download.data;if(!blob)throw new Error('No file data returned');
-    let textValue='';\n    let ocrConfidenceSum={total:0,count:0};
+    let textValue='';
+    let ocrConfidenceSum={total:0,count:0};
     const isPdf=mime.includes('pdf')||/\.pdf$/i.test(name);
     if(isPdf){
      const bytes=new Uint8Array(await blob.arrayBuffer());
@@ -1159,7 +1160,8 @@ $('runPatientOcr').addEventListener('click',async()=>{
       try{
        await ocrWithTimeout(page.render({canvasContext:canvas.getContext('2d'),viewport}).promise,30000,'PDF page render');
        const recognised=await ocrWithTimeout(worker.recognize(canvas),60000,'OCR page '+p);
-       textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';\n      if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total+=Number(recognised.data.confidence);ocrConfidenceSum.count++;}
+       textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';
+        if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total+=Number(recognised.data.confidence);ocrConfidenceSum.count++;}
       }finally{canvas.width=canvas.height=1;page.cleanup?.()}
      }
      if(pdf.numPages>pageLimit)textValue+='\n[Only first '+pageLimit+' pages processed; document has '+pdf.numPages+' pages.]\n';
@@ -1171,7 +1173,8 @@ $('runPatientOcr').addEventListener('click',async()=>{
      try{
       canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
       const recognised=await ocrWithTimeout(worker.recognize(canvas),75000,'Image OCR');
-      textValue=recognised.data.text||'';\n      if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total=Number(recognised.data.confidence);ocrConfidenceSum.count=1;}
+      textValue=recognised.data.text||'';
+        if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total=Number(recognised.data.confidence);ocrConfidenceSum.count=1;}
      }finally{bitmap.close?.();canvas.width=canvas.height=1}
     }else throw new Error('Unsupported file format: '+mime);
     results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue,confidence:ocrConfidenceSum.count?ocrConfidenceSum.total/ocrConfidenceSum.count:null});
