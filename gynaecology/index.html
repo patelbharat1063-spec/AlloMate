@@ -179,6 +179,23 @@
 <section id="reports" class="section">
 <div class="panel" style="margin-top:14px;border:2px solid #176b5b"><h2>Download patient documents as one PDF</h2><p class="muted">First select a patient. This button combines every uploaded PDF and image for that patient into one file.</p><div class="field" style="max-width:480px;margin-bottom:12px"><label for="documentPatientFilter">Select patient / દર્દી પસંદ કરો</label><select id="documentPatientFilter"><option value="">Select a patient to view documents</option></select></div><button type="button" class="btn" id="downloadPatientDocumentsPdf" disabled style="width:100%;min-height:48px;font-size:16px">Download all patient documents as PDF</button><div id="documentPdfMsg" class="small muted" aria-live="polite"></div></div>
 </div>
+<div class="panel" style="margin-top:14px;border:2px solid #176b5b" id="patientOcrPanel">
+<h2>Extract & organise patient reports / દસ્તાવેજોમાંથી માહિતી મેળવો</h2>
+<p class="muted">Select a patient above, choose clinical report images or PDFs, then extract the text into a structured, patient-wise review sheet.</p>
+<div id="ocrDocumentChoices" class="small muted" style="max-height:260px;overflow:auto;border:1px solid #d8e4e1;border-radius:10px;padding:10px">Select a patient to list clinical documents.</div>
+<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+<button type="button" class="btn secondary" id="ocrSelectAll">Select all clinical reports</button>
+<button type="button" class="btn" id="runPatientOcr">Extract selected documents</button>
+</div>
+<div id="patientOcrStatus" class="small muted" aria-live="polite" style="margin-top:10px"></div>
+<label for="patientOcrOutput" style="display:block;margin-top:12px">Organised extraction / ગોઠવેલી માહિતી</label>
+<textarea id="patientOcrOutput" rows="18" style="width:100%;font-family:inherit;line-height:1.5" placeholder="Extracted report text will appear here, arranged by patient, document type, date and source file."></textarea>
+<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">
+<button type="button" class="btn secondary" id="copyPatientOcr">Copy extracted report</button>
+<button type="button" class="btn secondary" id="downloadPatientOcr">Download .txt report</button>
+</div>
+<p class="small muted" style="margin-top:10px">Privacy: identity documents (Aadhaar, PAN, etc.) are excluded from bulk selection. OCR runs in this browser after secure download through your signed-in Supabase session. Text is not saved automatically. Verify every value, date, unit and handwritten entry against the original report before using it clinically.</p>
+</div>
 <div class="panel" style="margin-top:14px"><h2>Patient documents list</h2><div class="tablewrap"><table><thead><tr><th>Patient</th><th>Document</th><th>Type</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="attachmentRows"></tbody></table></div></div>
 <div class="panel"><h2>Secure patient document upload</h2><form id="attachmentForm"><div class="fields">
 <div class="field"><label>Patient *</label><select name="patient_id" id="attachmentPatient" required></select></div>
@@ -858,6 +875,7 @@ function renderPatientDocuments(){
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
  target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-move-attachment="up" data-id="'+esc(d.id)+'">↑</button> <button type="button" class="btn secondary" data-move-attachment="down" data-id="'+esc(d.id)+'">↓</button> <button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button> <button type="button" class="btn danger" data-delete-attachment="'+esc(d.id)+'">Delete</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
+ renderOcrDocuments();
 }
 $('documentPatientFilter').addEventListener('change',renderPatientDocuments);
 async function ensurePdfLib(){
@@ -975,6 +993,135 @@ $('attachmentRows').addEventListener('click',async e=>{
  const item=(moduleData.gyn_attachments||[]).find(x=>x.id===openBtn.dataset.attachment);if(!item)return;
  const {data,error}=await db.storage.from(item.storage_bucket).createSignedUrl(item.storage_path,60);
  if(error){alert(error.message);return}window.open(data.signedUrl,'_blank','noopener');
+});
+
+
+// Patient document OCR: browser-side processing of files downloaded through the authenticated Supabase client.
+function isIdentityAttachment(d){return ['aadhaar_masked','pan_card','voter_id','passport','driving_license','address_proof','insurance_card','other_patient_document'].includes(String(d.entity_type||'').toLowerCase())}
+function renderOcrDocuments(){
+ const host=$('ocrDocumentChoices'),patientId=$('documentPatientFilter')?.value;
+ if(!host)return;
+ if(!patientId){host.textContent='Select a patient to list clinical documents.';return}
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
+ const clinical=docs.filter(d=>!isIdentityAttachment(d));
+ if(!clinical.length){host.innerHTML='<span class="muted">No clinical reports available for OCR. Identity documents are intentionally excluded.</span>';return}
+ host.innerHTML=clinical.map(d=>{
+  const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'');
+  const supported=mime.startsWith('image/')||mime.includes('pdf')||/\.pdf$/i.test(name);
+  return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #edf1f0"><input type="checkbox" class="patient-ocr-check" value="'+esc(d.id)+'" '+(supported?'checked disabled':'disabled')+' style="margin-top:4px"><span><strong>'+esc(name||'Uploaded document')+'</strong><br><span class="muted">'+esc(d.entity_type||'Clinical record')+' · '+esc(isoLocal(d.created_at))+(supported?'':' · Unsupported file type')+'</span></span></label>';
+ }).join('');
+ // Enable checkboxes for supported clinical files; identity documents never appear in this list.
+ host.querySelectorAll('.patient-ocr-check').forEach(el=>{el.disabled=false;});
+}
+async function loadOcrLibrary(kind){
+ if(kind==='image'&&window.Tesseract)return;
+ if(kind==='pdf'&&window.pdfjsLib)return;
+ await new Promise((resolve,reject)=>{
+  const script=document.createElement('script');
+  script.src=kind==='image'?'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the '+(kind==='image'?'OCR':'PDF reader')+' library. Check internet access and retry.'));
+  document.head.appendChild(script);
+ });
+ if(kind==='pdf'&&window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ if(kind==='image'&&!window.Tesseract)throw new Error('OCR engine did not initialise.');
+ if(kind==='pdf'&&!window.pdfjsLib)throw new Error('PDF reader did not initialise.');
+}
+function classifyOcrDoc(d){
+ const t=String(d.entity_type||'').toLowerCase(),n=String(d.original_filename||'').toLowerCase();
+ if(t==='ultrasound'||/usg|ultrasound|nt scan|anomaly scan/.test(n))return 'Ultrasound & imaging';
+ if(/cbc|haem|hemat|blood|rbs|glucose|tsh|thyroid|urine|lab|investig/.test(n)||t==='investigation')return 'Laboratory investigations';
+ if(/prescription|medicine|rx/.test(n))return 'Prescription & medication';
+ if(t==='anc_visit'||t==='pregnancy')return 'Antenatal & pregnancy records';
+ return 'Other clinical documents';
+}
+function buildOcrReport(patient,items){
+ const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
+ const groups={};
+ items.forEach(x=>(groups[x.category]??=[]).push(x));
+ let out='PATIENT DOCUMENT EXTRACTION REPORT\n================================\n';
+ out+='Patient: '+patientName+'\nPatient code: '+(patient?.patient_code||'Not available')+'\nGenerated: '+new Date().toLocaleString()+'\n';
+ out+='Documents processed: '+items.length+'\n\n';
+ out+='IMPORTANT: OCR transcription only. Verify all dates, measurements, units, medication names and values against the original documents. Unclear text is marked [unclear]. This is not an automated diagnosis.\n';
+ for(const [category,docs] of Object.entries(groups)){
+  out+='\n\n'+category.toUpperCase()+'\n'+'='.repeat(category.length)+'\n';
+  docs.forEach((x,i)=>{
+   out+='\n'+(i+1)+'. '+x.name+'\n';
+   out+='Document date/uploaded: '+x.date+'\n';
+   out+='Document type: '+x.type+'\n';
+   out+='----------------------------------------\n';
+   out+=(x.text||'[No readable text detected]').trim()+'\n';
+  });
+ }
+ return out;
+}
+$('ocrSelectAll').addEventListener('click',()=>{
+ const checks=[...document.querySelectorAll('.patient-ocr-check')];
+ checks.forEach(x=>x.checked=true);
+ $('patientOcrStatus').textContent=checks.length+' clinical document(s) selected. Identity documents are excluded.';
+});
+$('runPatientOcr').addEventListener('click',async()=>{
+ const patientId=$('documentPatientFilter').value,patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
+ if(!patientId||!patient){alert('Select a patient first.');return}
+ const ids=[...document.querySelectorAll('.patient-ocr-check:checked')].map(x=>x.value);
+ if(!ids.length){alert('Select at least one clinical document.');return}
+ const docs=ids.map(id=>(moduleData.gyn_attachments||[]).find(d=>d.id===id)).filter(Boolean);
+ const button=$('runPatientOcr'),status=$('patientOcrStatus'),output=$('patientOcrOutput');
+ button.disabled=true;$('ocrSelectAll').disabled=true;output.value='';
+ const results=[];
+ let worker=null;
+ try{
+  const hasImages=docs.some(d=>String(d.mime_type||'').toLowerCase().startsWith('image/'));
+  const hasPdf=docs.some(d=>String(d.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(d.original_filename||''));
+  if(hasImages)await loadOcrLibrary('image');
+  if(hasPdf)await loadOcrLibrary('pdf');
+  if(hasImages){worker=await Tesseract.createWorker('eng');}
+  for(let i=0;i<docs.length;i++){
+   const d=docs[i],name=d.original_filename||'Uploaded document',mime=String(d.mime_type||'').toLowerCase();
+   status.textContent='Securely downloading and reading '+(i+1)+' of '+docs.length+': '+name;
+   const {data:blob,error}=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);
+   if(error)throw new Error('Could not access '+name+': '+error.message);
+   let textValue='';
+   const isPdf=mime.includes('pdf')||/\.pdf$/i.test(name);
+   if(isPdf){
+    const bytes=new Uint8Array(await blob.arrayBuffer()),pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+    for(let p=1;p<=pdf.numPages;p++){
+     status.textContent='Reading '+name+' · page '+p+' of '+pdf.numPages;
+     const page=await pdf.getPage(p),viewport=page.getViewport({scale:1.6});
+     const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+     await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+     const recognised=await worker.recognize(canvas);
+     textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';
+     canvas.width=canvas.height=1;
+    }
+    await pdf.destroy();
+   }else if(mime.startsWith('image/')){
+    const recognised=await worker.recognize(blob);textValue=recognised.data.text||'';
+   }else{
+    textValue='[Unsupported format: '+mime+']';
+   }
+   results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue});
+  }
+  output.value=buildOcrReport(patient,results);
+  status.textContent='Completed: '+results.length+' document(s) extracted. Review the text and original files carefully.';
+ }catch(err){
+  status.textContent='Extraction stopped: '+(err.message||String(err));
+  if(results.length)output.value=buildOcrReport(patient,results)+'\n\nNOTE: Processing stopped before all selected documents were completed.';
+ }finally{
+  if(worker)try{await worker.terminate()}catch(e){}
+  button.disabled=false;$('ocrSelectAll').disabled=false;
+ }
+});
+$('copyPatientOcr').addEventListener('click',async()=>{
+ const value=$('patientOcrOutput').value;if(!value.trim()){alert('There is no extracted report to copy.');return}
+ try{await navigator.clipboard.writeText(value);$('patientOcrStatus').textContent='Extracted report copied.'}
+ catch(e){$('patientOcrOutput').focus();$('patientOcrOutput').select();document.execCommand('copy');$('patientOcrStatus').textContent='Select and copy the highlighted report if clipboard access is blocked.'}
+});
+$('downloadPatientOcr').addEventListener('click',()=>{
+ const value=$('patientOcrOutput').value;if(!value.trim()){alert('There is no extracted report to download.');return}
+ const patient=(documentPatients||patients||[]).find(p=>p.id===$('documentPatientFilter').value);
+ const safe=(patient?.patient_code||'patient').replace(/[^a-z0-9_-]+/gi,'_');
+ const url=URL.createObjectURL(new Blob([value],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');
+ a.href=url;a.download=safe+'_document_extraction.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
 });
 
 $('paymentInvoice').addEventListener('change',()=>{
