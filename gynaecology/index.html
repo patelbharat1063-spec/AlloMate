@@ -1008,10 +1008,10 @@ function renderOcrDocuments(){
  host.innerHTML=clinical.map(d=>{
   const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'');
   const supported=mime.startsWith('image/')||mime.includes('pdf')||/\.pdf$/i.test(name);
-  return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #edf1f0"><input type="checkbox" class="patient-ocr-check" value="'+esc(d.id)+'" '+(supported?'checked disabled':'disabled')+' style="margin-top:4px"><span><strong>'+esc(name||'Uploaded document')+'</strong><br><span class="muted">'+esc(d.entity_type||'Clinical record')+' · '+esc(isoLocal(d.created_at))+(supported?'':' · Unsupported file type')+'</span></span></label>';
+  return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #edf1f0"><input type="checkbox" class="patient-ocr-check" data-supported="'+(supported?'1':'0')+'" value="'+esc(d.id)+'" '+(supported?'checked':'disabled')+' style="margin-top:4px"><span><strong>'+esc(name||'Uploaded document')+'</strong><br><span class="muted">'+esc(d.entity_type||'Clinical record')+' · '+esc(isoLocal(d.created_at))+(supported?'':' · Unsupported file type')+'</span></span></label>';
  }).join('');
  // Enable checkboxes for supported clinical files; identity documents never appear in this list.
- host.querySelectorAll('.patient-ocr-check').forEach(el=>{el.disabled=false;});
+ host.querySelectorAll('.patient-ocr-check[data-supported="1"]').forEach(el=>{el.disabled=false;});
 }
 async function loadOcrLibrary(kind){
  if(kind==='image'&&window.Tesseract)return;
@@ -1055,7 +1055,7 @@ function buildOcrReport(patient,items){
  return out;
 }
 $('ocrSelectAll').addEventListener('click',()=>{
- const checks=[...document.querySelectorAll('.patient-ocr-check')];
+ const checks=[...document.querySelectorAll('.patient-ocr-check[data-supported="1"]')];
  checks.forEach(x=>x.checked=true);
  $('patientOcrStatus').textContent=checks.length+' clinical document(s) selected. Identity documents are excluded.';
 });
