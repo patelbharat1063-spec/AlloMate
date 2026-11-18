@@ -1034,25 +1034,35 @@ function classifyOcrDoc(d){
  if(t==='anc_visit'||t==='pregnancy')return 'Antenatal & pregnancy records';
  return 'Other clinical documents';
 }
+function formatDocumentContent(x){
+ const lines=String(x.text||'').split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+ let out='DOCUMENT: '+x.name+'\nUploaded: '+x.date+' | Type: '+x.type+'\n';
+ const groups=[
+  ['Ultrasound measurements and findings',/\b(CRL|FHR|GS|MGS|EDD|LMP|GA|NT|BPD|HC|AC|FL|yolk sac|cardiac activity|placenta|scar|impression|conclusion)\b/i],
+  ['Laboratory parameters',/\b(Hb|haemoglobin|hemoglobin|RBC|WBC|TLC|platelet|MCV|MCH|MCHC|PCV|HCT|TSH|glucose|RBS|FBS|urine|albumin|HIV|HBsAg|reference range)\b/i],
+  ['Prescription and dosage lines',/\b(tablet|tab|capsule|cap|syrup|injection|inj|mg|mcg|ml|OD|BD|TDS|QDS|HS|daily|twice|after food|before food)\b/i],
+  ['Other clinical observations',/\b(BP|blood pressure|pulse|SpO2|weight|height|BMI|temperature|diagnosis|advice|follow.?up)\b/i]
+ ];
+ for(const [heading,re] of groups){
+  const matches=lines.filter(line=>re.test(line));
+  if(matches.length){out+='\n'+heading.toUpperCase()+'\n';matches.forEach(line=>out+='• '+line+'\n');}
+ }
+ out+='\nFULL OCR TEXT — SOURCE TRANSCRIPTION\n';
+ out+=(lines.join('\n')||'[No readable text detected]')+'\n';
+ return out;
+}
 function buildOcrReport(patient,items){
- const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
- const groups={};
- items.forEach(x=>(groups[x.category]??=[]).push(x));
- let out='PATIENT DOCUMENT EXTRACTION REPORT\n================================\n';
- out+='Patient: '+patientName+'\nPatient code: '+(patient?.patient_code||'Not available')+'\nGenerated: '+new Date().toLocaleString()+'\n';
- out+='Documents processed: '+items.length+'\n\n';
- out+='IMPORTANT: OCR transcription only. Verify all dates, measurements, units, medication names and values against the original documents. Unclear text is marked [unclear]. This is not an automated diagnosis.\n';
+ const name=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
+ const groups={};items.forEach(x=>(groups[x.category]??=[]).push(x));
+ let out='PATIENT DOCUMENT EXTRACTION — ORGANISED CLINICAL REVIEW\n';
+ out+='======================================================\n';
+ out+='Patient: '+name+'\nPatient code: '+(patient?.patient_code||'Not available')+'\nGenerated: '+new Date().toLocaleString()+'\nDocuments processed: '+items.length+'\n';
+ out+='\nIMPORTANT: This is OCR transcription and automatic line grouping, not validated clinical interpretation. Verify all values, decimals, units, dates and medicine doses against each original document.\n';
  for(const [category,docs] of Object.entries(groups)){
   out+='\n\n'+category.toUpperCase()+'\n'+'='.repeat(category.length)+'\n';
-  docs.forEach((x,i)=>{
-   out+='\n'+(i+1)+'. '+x.name+'\n';
-   out+='Document date/uploaded: '+x.date+'\n';
-   out+='Document type: '+x.type+'\n';
-   out+='----------------------------------------\n';
-   out+=(x.text||'[No readable text detected]').trim()+'\n';
-  });
+  docs.forEach((x,i)=>out+='\n'+(i+1)+'. '+formatDocumentContent(x)+'\n'+'-'.repeat(48)+'\n');
  }
- return out;
+ return out+'\nEND OF REPORT\n';
 }
 $('ocrSelectAll').addEventListener('click',()=>{
  const checks=[...document.querySelectorAll('.patient-ocr-check[data-supported="1"]')];
