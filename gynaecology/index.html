@@ -1002,16 +1002,33 @@ function renderOcrDocuments(){
  const host=$('ocrDocumentChoices'),patientId=$('documentPatientFilter')?.value;
  if(!host)return;
  if(!patientId){host.textContent='Select a patient to list clinical documents.';return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
- const clinical=docs.filter(d=>!isIdentityAttachment(d));
- if(!clinical.length){host.innerHTML='<span class="muted">No clinical reports available for OCR. Identity documents are intentionally excluded.</span>';return}
- host.innerHTML=clinical.map(d=>{
-  const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'');
-  const supported=mime.startsWith('image/')||mime.includes('pdf')||/\.pdf$/i.test(name);
-  return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #edf1f0"><input type="checkbox" class="patient-ocr-check" data-supported="'+(supported?'1':'0')+'" value="'+esc(d.id)+'" '+(supported?'checked':'disabled')+' style="margin-top:4px"><span><strong>'+esc(name||'Uploaded document')+'</strong><br><span class="muted">'+esc(d.entity_type||'Clinical record')+' · '+esc(isoLocal(d.created_at))+(supported?'':' · Unsupported file type')+'</span></span></label>';
- }).join('');
- // Enable checkboxes for supported clinical files; identity documents never appear in this list.
- host.querySelectorAll('.patient-ocr-check[data-supported="1"]').forEach(el=>{el.disabled=false;});
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patientId&&!isIdentityAttachment(d));
+ if(!docs.length){host.innerHTML='<span class="muted">No clinical reports available for OCR. Personal identity documents are excluded.</span>';return}
+ const groups={};
+ docs.forEach(d=>{const key=classifyOcrDoc(d);(groups[key]??=[]).push(d)});
+ const order=['Ultrasound & imaging','Laboratory investigations','Prescription & medication','Antenatal & pregnancy records','Other clinical documents'];
+ let html='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><strong id="ocrSelectionCount">0 selected</strong><span class="muted">· Identity documents are excluded</span></div>';
+ html+='<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn secondary" id="ocrChooseAll" style="padding:6px 10px">Select all supported</button><button type="button" class="btn secondary" id="ocrClearAll" style="padding:6px 10px">Clear selection</button></div>';
+ for(const category of order){
+  const list=(groups[category]||[]).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)||String(a.original_filename||'').localeCompare(String(b.original_filename||'')));
+  if(!list.length)continue;
+  const key='ocrgrp'+order.indexOf(category);
+  html+='<section style="border:1px solid #dce7e3;border-radius:9px;margin:9px 0;overflow:hidden"><div style="background:#f0f6f3;padding:9px 10px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><strong>'+esc(category)+'</strong><button type="button" class="btn secondary ocr-category-select" data-group="'+key+'" style="padding:5px 9px;font-size:12px">Select category</button></div><div style="padding:4px 10px">';
+  list.forEach(d=>{
+   const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'Uploaded document');
+   const supported=mime.startsWith('image/')||mime.includes('pdf')||/\.pdf$/i.test(name);
+   const ext=/\.pdf$/i.test(name)?'PDF':(mime.startsWith('image/')?'IMAGE':'FILE');
+   html+='<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 2px;border-bottom:1px solid #edf1f0"><input type="checkbox" class="patient-ocr-check" data-group="'+key+'" data-supported="'+(supported?'1':'0')+'" value="'+esc(d.id)+'" '+(supported?'':'disabled')+' style="margin-top:4px;min-width:18px;min-height:18px"><span style="min-width:0;flex:1"><strong style="overflow-wrap:anywhere">'+esc(name)+'</strong><br><span class="muted">'+esc(ext)+' · '+esc(isoLocal(d.created_at))+(supported?'':' · Unsupported format')+'</span></span></label>';
+  });
+  html+='</div></section>';
+ }
+ host.innerHTML=html;
+ const update=()=>{const n=host.querySelectorAll('.patient-ocr-check:checked').length;const count=$('ocrSelectionCount');if(count)count.textContent=n+' selected';};
+ host.querySelectorAll('.patient-ocr-check').forEach(el=>el.addEventListener('change',update));
+ $('ocrChooseAll')?.addEventListener('click',()=>{host.querySelectorAll('.patient-ocr-check[data-supported="1"]').forEach(el=>el.checked=true);update()});
+ $('ocrClearAll')?.addEventListener('click',()=>{host.querySelectorAll('.patient-ocr-check').forEach(el=>el.checked=false);update()});
+ host.querySelectorAll('.ocr-category-select').forEach(btn=>btn.addEventListener('click',()=>{host.querySelectorAll('.patient-ocr-check[data-group="'+btn.dataset.group+'"][data-supported="1"]').forEach(el=>el.checked=true);update()}));
+ update();
 }
 async function loadOcrLibrary(kind){
  if(kind==='image'&&window.Tesseract)return;
@@ -1069,56 +1086,85 @@ $('ocrSelectAll').addEventListener('click',()=>{
  checks.forEach(x=>x.checked=true);
  $('patientOcrStatus').textContent=checks.length+' clinical document(s) selected. Identity documents are excluded.';
 });
+function ocrWithTimeout(promise,ms,label){
+ let timer;
+ return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' timed out')),ms)})]).finally(()=>clearTimeout(timer));
+}
+async function createPatientOcrWorker(){
+ const w=await Tesseract.createWorker('eng');
+ return w;
+}
 $('runPatientOcr').addEventListener('click',async()=>{
  const patientId=$('documentPatientFilter').value,patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  if(!patientId||!patient){alert('Select a patient first.');return}
  const ids=[...document.querySelectorAll('.patient-ocr-check:checked')].map(x=>x.value);
- if(!ids.length){alert('Select at least one clinical document.');return}
+ if(!ids.length){alert('Select at least one supported clinical document.');return}
  const docs=ids.map(id=>(moduleData.gyn_attachments||[]).find(d=>d.id===id)).filter(Boolean);
- const button=$('runPatientOcr'),status=$('patientOcrStatus'),output=$('patientOcrOutput');
- button.disabled=true;$('ocrSelectAll').disabled=true;output.value='';
- const results=[];
+ const button=$('runPatientOcr'),status=$('patientOcrStatus'),output=$('patientOcrOutput'),selectAll=$('ocrSelectAll');
+ button.disabled=true;if(selectAll)selectAll.disabled=true;output.value='';
+ const results=[],failures=[];
  let worker=null;
  try{
   const hasImages=docs.some(d=>String(d.mime_type||'').toLowerCase().startsWith('image/'));
   const hasPdf=docs.some(d=>String(d.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(d.original_filename||''));
   if(hasImages)await loadOcrLibrary('image');
   if(hasPdf)await loadOcrLibrary('pdf');
-  if(hasImages){worker=await Tesseract.createWorker('eng');}
+  if(hasImages)worker=await createPatientOcrWorker();
   for(let i=0;i<docs.length;i++){
    const d=docs[i],name=d.original_filename||'Uploaded document',mime=String(d.mime_type||'').toLowerCase();
-   status.textContent='Securely downloading and reading '+(i+1)+' of '+docs.length+': '+name;
-   const {data:blob,error}=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);
-   if(error)throw new Error('Could not access '+name+': '+error.message);
-   let textValue='';
-   const isPdf=mime.includes('pdf')||/\.pdf$/i.test(name);
-   if(isPdf){
-    const bytes=new Uint8Array(await blob.arrayBuffer()),pdf=await pdfjsLib.getDocument({data:bytes}).promise;
-    for(let p=1;p<=pdf.numPages;p++){
-     status.textContent='Reading '+name+' · page '+p+' of '+pdf.numPages;
-     const page=await pdf.getPage(p),viewport=page.getViewport({scale:1.6});
-     const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
-     await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
-     const recognised=await worker.recognize(canvas);
-     textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';
-     canvas.width=canvas.height=1;
+   status.textContent='Processing '+(i+1)+' of '+docs.length+': '+name;
+   try{
+    const download=await ocrWithTimeout(db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path),45000,'Secure download');
+    if(download.error)throw new Error(download.error.message||'Download failed');
+    const blob=download.data;if(!blob)throw new Error('No file data returned');
+    let textValue='';
+    const isPdf=mime.includes('pdf')||/\.pdf$/i.test(name);
+    if(isPdf){
+     const bytes=new Uint8Array(await blob.arrayBuffer());
+     const pdf=await ocrWithTimeout(pdfjsLib.getDocument({data:bytes}).promise,45000,'PDF opening');
+     const pageLimit=Math.min(pdf.numPages,12);
+     for(let p=1;p<=pageLimit;p++){
+      status.textContent='Reading '+name+' · page '+p+' of '+pageLimit+' (document '+(i+1)+' of '+docs.length+')';
+      const page=await pdf.getPage(p),base=page.getViewport({scale:1.2}),scale=Math.min(1,2000/Math.max(base.width,base.height)),viewport=page.getViewport({scale:1.2*scale});
+      const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+      try{
+       await ocrWithTimeout(page.render({canvasContext:canvas.getContext('2d'),viewport}).promise,30000,'PDF page render');
+       const recognised=await ocrWithTimeout(worker.recognize(canvas),60000,'OCR page '+p);
+       textValue+='\n[Page '+p+']\n'+(recognised.data.text||'')+'\n';
+      }finally{canvas.width=canvas.height=1;page.cleanup?.()}
+     }
+     if(pdf.numPages>pageLimit)textValue+='\n[Only first '+pageLimit+' pages processed; document has '+pdf.numPages+' pages.]\n';
+     await pdf.destroy();
+    }else if(mime.startsWith('image/')){
+     const bitmap=await createImageBitmap(blob);
+     const scale=Math.min(1,2200/Math.max(bitmap.width,bitmap.height));
+     const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+     try{
+      canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const recognised=await ocrWithTimeout(worker.recognize(canvas),75000,'Image OCR');
+      textValue=recognised.data.text||'';
+     }finally{bitmap.close?.();canvas.width=canvas.height=1}
+    }else throw new Error('Unsupported file format: '+mime);
+    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue});
+   }catch(docErr){
+    failures.push({name,error:docErr.message||String(docErr)});
+    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:'[EXTRACTION FAILED: '+(docErr.message||String(docErr))+']'});
+    if(worker){try{await worker.terminate()}catch(e){}worker=null}
+    if(i<docs.length-1&&docs.slice(i+1).some(x=>String(x.mime_type||'').toLowerCase().startsWith('image/')||String(x.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(x.original_filename||''))){
+     try{worker=await createPatientOcrWorker()}catch(restartErr){failures.push({name:'OCR engine',error:restartErr.message||String(restartErr)});status.textContent='OCR engine could not restart; remaining documents will be marked as failed.';for(const rest of docs.slice(i+1)){failures.push({name:rest.original_filename||'Uploaded document',error:'OCR engine unavailable'});results.push({name:rest.original_filename||'Uploaded document',type:rest.entity_type||'Clinical record',date:isoLocal(rest.created_at),category:classifyOcrDoc(rest),text:'[NOT PROCESSED: OCR engine unavailable]'})}break}
     }
-    await pdf.destroy();
-   }else if(mime.startsWith('image/')){
-    const recognised=await worker.recognize(blob);textValue=recognised.data.text||'';
-   }else{
-    textValue='[Unsupported format: '+mime+']';
    }
-   results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue});
+   output.value=buildOcrReport(patient,results);
+   status.textContent='Processed '+(i+1)+' of '+docs.length+' · '+results.length+' recorded · '+failures.length+' failed';
   }
   output.value=buildOcrReport(patient,results);
-  status.textContent='Completed: '+results.length+' document(s) extracted. Review the text and original files carefully.';
+  status.textContent='Finished: '+(docs.length-failures.length)+' successful, '+failures.length+' failed of '+docs.length+'. Failed files are listed in the report for retry.';
  }catch(err){
-  status.textContent='Extraction stopped: '+(err.message||String(err));
-  if(results.length)output.value=buildOcrReport(patient,results)+'\n\nNOTE: Processing stopped before all selected documents were completed.';
+  status.textContent='OCR setup failed: '+(err.message||String(err));
+  if(results.length)output.value=buildOcrReport(patient,results);
  }finally{
   if(worker)try{await worker.terminate()}catch(e){}
-  button.disabled=false;$('ocrSelectAll').disabled=false;
+  button.disabled=false;if(selectAll)selectAll.disabled=false;
  }
 });
 $('copyPatientOcr').addEventListener('click',async()=>{
