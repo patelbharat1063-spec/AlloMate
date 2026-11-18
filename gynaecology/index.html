@@ -853,7 +853,7 @@ function renderPatientDocuments(){
  const pdfButton=$('downloadPatientDocumentsPdf');if(pdfButton)pdfButton.disabled=!docs.length;
  const patient=(documentPatients||patients||[]).find(p=>p.id===patientId);
  const patientName=patient?(patient.patient_name||patient.full_name||patient.name||patient.patient_code||'Patient'):'Patient';
- target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
+ target.innerHTML=docs.length?docs.map(d=>'<tr><td>'+esc(patientName)+'</td><td>'+esc(d.original_filename||'—')+'</td><td>'+esc(d.entity_type||'—')+'</td><td>'+esc(isoLocal(d.created_at))+'</td><td><button type="button" class="btn secondary" data-attachment="'+esc(d.id)+'">Open</button> <button type="button" class="btn secondary" data-rename-attachment="'+esc(d.id)+'">Edit name</button> <button type="button" class="btn danger" data-delete-attachment="'+esc(d.id)+'">Delete</button></td></tr>').join(''):'<tr><td colspan="5" class="empty">No documents found for this patient.</td></tr>';
 }
 $('documentPatientFilter').addEventListener('change',renderPatientDocuments);
 async function ensurePdfLib(){
@@ -935,6 +935,24 @@ $('attachmentRows').addEventListener('click',async e=>{
   if(error){alert('Could not rename document: '+error.message);return}
   if(!data){alert('No document was updated. Check your clinic permissions and try again.');return}
   item.original_filename=name;renderPatientDocuments();return;
+ }
+ const deleteBtn=e.target.closest('[data-delete-attachment]');
+ if(deleteBtn){
+  if(!['owner','doctor'].includes(role)){alert('Only the clinic owner or doctor can delete uploaded documents.');return}
+  const item=(moduleData.gyn_attachments||[]).find(x=>x.id===deleteBtn.dataset.deleteAttachment);if(!item)return;
+  const label=item.original_filename||'this uploaded document';
+  if(!confirm('Permanently delete "'+label+'" from this patient record? This cannot be undone.'))return;
+  deleteBtn.disabled=true;
+  const {data:deleted,error:deleteError}=await db.from('gyn_attachments').delete().eq('id',item.id).eq('clinic_id',clinic.id).select('id').maybeSingle();
+  if(deleteError){deleteBtn.disabled=false;alert('Could not delete document record: '+deleteError.message);return}
+  if(!deleted){deleteBtn.disabled=false;alert('No document record was deleted. Check your clinic permissions.');return}
+  moduleData.gyn_attachments=(moduleData.gyn_attachments||[]).filter(x=>x.id!==item.id);
+  const {error:storageError}=await db.storage.from(item.storage_bucket||'gyn-private').remove([item.storage_path]);
+  await db.from('gyn_audit_logs').insert({clinic_id:clinic.id,actor_id:user.id,action:'document_deleted',entity_type:'gyn_attachments',details:{patient_id:item.patient_id,attachment_id:item.id,filename:label,storage_deleted:!storageError}});
+  renderPatientDocuments();
+  if(storageError)alert('The document was removed from the patient list, but its private storage file could not be deleted: '+storageError.message+'. Please ask the clinic administrator to clean up the stored file.');
+  else alert('Document deleted successfully.');
+  return;
  }
  const openBtn=e.target.closest('[data-attachment]');if(!openBtn)return;
  const item=(moduleData.gyn_attachments||[]).find(x=>x.id===openBtn.dataset.attachment);if(!item)return;
