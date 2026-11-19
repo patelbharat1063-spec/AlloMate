@@ -195,7 +195,7 @@
  <div class="field"><label for="compareEarlierDoc">Earlier report</label><select id="compareEarlierDoc"><option value="">Extract reports first</option></select></div>
  <div class="field"><label for="compareLaterDoc">Later report</label><select id="compareLaterDoc"><option value="">Extract reports first</option></select></div>
 </div>
-<div class="row" style="margin-top:10px"><button type="button" class="btn" id="runClinicalComparison" disabled>Compare selected reports</button><button type="button" class="btn secondary" id="printClinicalComparison" disabled>Print comparison</button></div>
+<div class="row" style="margin-top:10px"><button type="button" class="btn" id="runClinicalComparison" disabled>Compare selected reports</button><button type="button" class="btn secondary" id="printClinicalComparison" disabled>Print comparison</button></div><div class="row" style="margin-top:10px"><button type="button" class="btn" id="buildClinicDocumentReport" disabled>Build comprehensive clinic document report</button><button type="button" class="btn secondary" id="printClinicDocumentReport" disabled>Print clinic report</button><button type="button" class="btn secondary" id="downloadClinicDocumentReport" disabled>Download clinic report</button></div><p class="small muted">Clinic report combines documents extracted in this browser session across patients. Extract each patient’s documents to add them. Numeric comparison is restricted to reports belonging to the same patient; clinic-wide counts do not compare one patient’s results with another’s.</p><div id="clinicDocumentReportOutput" style="margin-top:12px"></div>
 <div id="clinicalComparisonOutput" style="margin-top:12px" aria-live="polite"><div class="empty">No comparison generated yet.</div></div>
 </div>
 <textarea id="patientOcrOutput" rows="18" style="width:100%;font-family:inherit;line-height:1.5" placeholder="Extracted report text will appear here, arranged by patient, document type, date and source file."></textarea>
@@ -1147,12 +1147,12 @@ function refreshClinicalComparisonChoices(){
  const earlier=$('compareEarlierDoc'),later=$('compareLaterDoc'),run=$('runClinicalComparison');
  if(!earlier||!later)return;
  const oldA=earlier.value,oldB=later.value;
- const options='<option value="">Select report</option>'+comparativeClinicalOcrItems.map((x,i)=>'<option value="'+i+'">'+esc((x.date||'Date unknown')+' · '+(x.name||'Report'))+'</option>').join('');
+ const options='<option value="">Select report</option>'+comparativeClinicalOcrItems.map((x,i)=>'<option value="'+i+'">'+esc((x.patientCode||x.patientName||'Patient')+' · '+(x.date||'Date unknown')+' · '+(x.name||'Report'))+'</option>').join('');
  earlier.innerHTML=options;later.innerHTML=options;
  if(comparativeClinicalOcrItems[Number(oldA)])earlier.value=oldA;
  if(comparativeClinicalOcrItems[Number(oldB)])later.value=oldB;
  if(comparativeClinicalOcrItems.length>=2){if(!earlier.value)earlier.value='0';if(!later.value)later.value=String(comparativeClinicalOcrItems.length-1)}
- run.disabled=comparativeClinicalOcrItems.length<2;
+ run.disabled=comparativeClinicalOcrItems.length<2;const clinicReportButton=$('buildClinicDocumentReport');if(clinicReportButton)clinicReportButton.disabled=comparativeClinicalOcrItems.length===0;
 }
 function clinicalComparisonLines(item){
  const lines=String(item?.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
@@ -1172,7 +1172,7 @@ function clinicalComparisonLines(item){
 function renderClinicalComparison(){
  const a=Number($('compareEarlierDoc').value),b=Number($('compareLaterDoc').value);
  const old= comparativeClinicalOcrItems[a],next=comparativeClinicalOcrItems[b],host=$('clinicalComparisonOutput');
- if(!old||!next||a===b){host.innerHTML='<div class="empty">Choose two different extracted reports.</div>';return}
+ if(!old||!next||a===b){host.innerHTML='<div class="empty">Choose two different extracted reports.</div>';return}if(old.patientId&&next.patientId&&old.patientId!==next.patientId){host.innerHTML='<div class="msg err">For clinical safety, compare reports from the same patient only. Select two reports belonging to the same patient.</div>';return}
  const x=clinicalComparisonLines(old),y=clinicalComparisonLines(next),keys=[...new Set([...x.keys(),...y.keys()])];
  const rows=keys.map(k=>{
   const p=x.get(k),q=y.get(k);
@@ -1184,13 +1184,32 @@ function renderClinicalComparison(){
  }).join('');
  const olderText=String(old.text||'').trim(),newerText=String(next.text||'').trim();
  const isImaging=/ultrasound|imaging|scan/i.test((old.category||'')+' '+(next.category||''));
- host.innerHTML='<div class="small muted">Earlier: '+esc(old.name)+' · '+esc(old.date)+'<br>Later: '+esc(next.name)+' · '+esc(next.date)+'</div>'+
+ host.innerHTML='<div class="small muted">Patient: '+esc(old.patientName||old.patientCode||'Patient')+' · Earlier: '+esc(old.name)+' · '+esc(old.date)+'<br>Later: '+esc(next.name)+' · '+esc(next.date)+'</div>'+
  (keys.length?'<div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Parameter (OCR label)</th><th>Earlier value</th><th>Later value</th><th>Observed difference</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<div class="empty">No clearly labelled numeric test lines could be matched automatically. Review the original reports side by side below.</div>')+
  (isImaging?'<div class="small muted" style="margin-top:12px"><strong>Imaging note:</strong> narrative impressions are displayed verbatim below; this tool does not interpret or grade ultrasound findings.</div>':'')+
  '<div class="grid" style="margin-top:12px"><div class="card"><strong>Earlier report — source OCR text</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 inherit">'+esc(olderText)+'</pre></div><div class="card"><strong>Later report — source OCR text</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 inherit">'+esc(newerText)+'</pre></div></div>'+
  '<p class="small muted" style="margin-top:10px">This is a transcription-assisted comparison, not a clinical interpretation. OCR can misread digits, decimal points, signs, dates and units. Missing values are not normal values. Differences are not labelled clinically significant; clinician must verify original reports, reference ranges, sample context and patient history.</p>';
  $('printClinicalComparison').disabled=false;
 }
+
+function buildComprehensiveClinicDocumentReport(){
+ const items=comparativeClinicalOcrItems.slice(),host=$('clinicDocumentReportOutput');if(!host)return;
+ if(!items.length){host.innerHTML='<div class="empty">No documents have been extracted in this session yet. Extract clinical reports for each patient to include them.</div>';return}
+ const byPatient=new Map(),byCategory=new Map();
+ items.forEach(x=>{const key=x.patientId||x.patientCode||x.patientName||'Unknown';if(!byPatient.has(key))byPatient.set(key,{name:x.patientName||'Patient',code:x.patientCode||'',docs:[]});byPatient.get(key).docs.push(x);const cat=x.category||'Other';byCategory.set(cat,(byCategory.get(cat)||0)+1)});
+ const low=items.filter(x=>Number.isFinite(Number(x.confidence))&&Number(x.confidence)<80);
+ const summary='<div class="grid"><div class="card"><div class="muted small">Patients represented</div><div class="stat">'+byPatient.size+'</div></div><div class="card"><div class="muted small">Documents extracted</div><div class="stat">'+items.length+'</div></div><div class="card"><div class="muted small">Low-confidence OCR</div><div class="stat">'+low.length+'</div></div></div>';
+ const categories='<h3>Document category breakdown</h3><div class="tablewrap"><table><thead><tr><th>Category</th><th>Documents</th></tr></thead><tbody>'+[...byCategory].map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join('')+'</tbody></table></div>';
+ const patientsHtml='<h3>Patient-wise document index</h3>'+[...byPatient.values()].map(p=>'<div class="card" style="margin:8px 0"><strong>'+esc(p.code+' · '+p.name)+'</strong><div class="small muted">'+p.docs.length+' document(s)</div><ul>'+p.docs.map(x=>'<li>'+esc(x.date+' · '+x.category+' · '+x.name)+' — OCR '+(Number.isFinite(Number(x.confidence))?Number(x.confidence).toFixed(1)+'%':'unavailable')+'</li>').join('')+'</ul></div>').join('');
+ const details='<h3>Extracted source documents</h3>'+items.map((x,i)=>'<details class="card" style="margin:8px 0"><summary><strong>'+esc((i+1)+'. '+(x.patientCode||x.patientName)+' · '+x.name)+'</strong><div class="small muted">'+esc(x.date+' · '+x.category+' · '+x.type)+'</div></summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 inherit;margin-top:10px">'+esc(x.text||'[No text]')+'</pre></details>').join('');
+ const warning='<p class="small muted">Only documents extracted in this browser session are included. Repeat extraction for each patient for a broader clinic report. Identity documents are excluded. OCR may misread values; this is a source index and transcription summary, not diagnosis or treatment advice. Verify all values against original documents.</p>';
+ host.innerHTML='<div id="clinicDocumentPrintable"><h2>Comprehensive clinic document report</h2><div class="small muted">Generated '+esc(new Date().toLocaleString())+'</div>'+summary+categories+patientsHtml+details+warning+'</div>';
+ $('printClinicDocumentReport').disabled=false;$('downloadClinicDocumentReport').disabled=false;
+}
+$('buildClinicDocumentReport').addEventListener('click',buildComprehensiveClinicDocumentReport);
+$('printClinicDocumentReport').addEventListener('click',()=>{const el=$('clinicDocumentPrintable');if(!el)return;const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print.');return}w.document.write('<html><head><title>Clinic document report</title><style>body{font:14px Arial;padding:22px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:7px;text-align:left}pre{white-space:pre-wrap;overflow-wrap:anywhere}details{break-inside:avoid}</style></head><body>'+el.innerHTML+'</body></html>');w.document.close();w.focus();w.print()});
+$('downloadClinicDocumentReport').addEventListener('click',()=>{const el=$('clinicDocumentPrintable');if(!el)return;const blob=new Blob([el.innerText],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='comprehensive_clinic_document_report.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)});
+
 $('runClinicalComparison').addEventListener('click',renderClinicalComparison);
 $('printClinicalComparison').addEventListener('click',()=>{const content=$('clinicalComparisonOutput');if(!content||!content.textContent.trim())return;const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the comparison.');return}w.document.write('<html><head><title>Comparative clinical report</title><style>body{font:14px Arial;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:7px;text-align:left}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><h2>Comparative clinical report</h2>'+content.innerHTML+'</body></html>');w.document.close();w.focus();w.print()});
 function ocrWithTimeout(promise,ms,label){
@@ -1255,10 +1274,10 @@ $('runPatientOcr').addEventListener('click',async()=>{
         if(Number.isFinite(Number(recognised.data.confidence))){ocrConfidenceSum.total=Number(recognised.data.confidence);ocrConfidenceSum.count=1;}
      }finally{bitmap.close?.();canvas.width=canvas.height=1}
     }else throw new Error('Unsupported file format: '+mime);
-    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue,confidence:ocrConfidenceSum.count?ocrConfidenceSum.total/ocrConfidenceSum.count:null});
+    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:textValue,confidence:ocrConfidenceSum.count?ocrConfidenceSum.total/ocrConfidenceSum.count:null,patientId:patient.id,patientName:patient.full_name||patient.name||'Patient',patientCode:patient.patient_code||''});
    }catch(docErr){
     failures.push({name,error:docErr.message||String(docErr)});
-    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:'[EXTRACTION FAILED: '+(docErr.message||String(docErr))+']'});
+    results.push({name,type:d.entity_type||'Clinical record',date:isoLocal(d.created_at),category:classifyOcrDoc(d),text:'[EXTRACTION FAILED: '+(docErr.message||String(docErr))+']',patientId:patient.id,patientName:patient.full_name||patient.name||'Patient',patientCode:patient.patient_code||''});
     if(worker){try{await worker.terminate()}catch(e){}worker=null}
     if(i<docs.length-1&&docs.slice(i+1).some(x=>String(x.mime_type||'').toLowerCase().startsWith('image/')||String(x.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(x.original_filename||''))){
      try{worker=await createPatientOcrWorker()}catch(restartErr){failures.push({name:'OCR engine',error:restartErr.message||String(restartErr)});status.textContent='OCR engine could not restart; remaining documents will be marked as failed.';for(const rest of docs.slice(i+1)){failures.push({name:rest.original_filename||'Uploaded document',error:'OCR engine unavailable'});results.push({name:rest.original_filename||'Uploaded document',type:rest.entity_type||'Clinical record',date:isoLocal(rest.created_at),category:classifyOcrDoc(rest),text:'[NOT PROCESSED: OCR engine unavailable]'})}break}
@@ -1268,7 +1287,7 @@ $('runPatientOcr').addEventListener('click',async()=>{
    status.textContent='Processed '+(i+1)+' of '+docs.length+' · '+results.length+' recorded · '+failures.length+' failed';
   }
   output.value=buildOcrReport(patient,results);
-  comparativeClinicalOcrItems=results.filter(x=>!String(x.text||'').startsWith('[EXTRACTION FAILED:')&&!String(x.text||'').startsWith('[NOT PROCESSED:'));
+  const successful=results.filter(x=>!String(x.text||'').startsWith('[EXTRACTION FAILED:')&&!String(x.text||'').startsWith('[NOT PROCESSED:'));successful.forEach(x=>{const key=[x.patientId,x.name,x.date].join('|');if(!comparativeClinicalOcrItems.some(y=>[y.patientId,y.name,y.date].join('|')===key))comparativeClinicalOcrItems.push(x)});
   refreshClinicalComparisonChoices();
   status.textContent='Finished: '+(docs.length-failures.length)+' successful, '+failures.length+' failed of '+docs.length+'. Failed files are listed in the report for retry.';
  }catch(err){
