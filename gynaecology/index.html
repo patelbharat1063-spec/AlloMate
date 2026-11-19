@@ -1192,18 +1192,68 @@ function renderClinicalComparison(){
  $('printClinicalComparison').disabled=false;
 }
 
+function extractClinicalCandidateValues(item){
+ const definitions=[
+  {key:'haemoglobin',label:'Haemoglobin',re:/\b(?:haemoglobin|hemoglobin|hb(?!sag))\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(g\s*\/?\s*dl|gm\s*\/?\s*dl|g\/l)?/i},
+  {key:'rbc',label:'RBC count',re:/\b(?:total\s*)?R\.?\s*B\.?\s*C\.?\s*(?:count)?\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*([a-z0-9./^µμ-]*)/i},
+  {key:'wbc',label:'WBC count',re:/\b(?:total\s*)?W\.?\s*B\.?\s*C\.?\s*(?:count)?\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*([a-z0-9./^µμ-]*)/i},
+  {key:'platelets',label:'Platelet count',re:/\b(?:total\s*)?platelet(?:s)?\s*(?:count)?\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*([a-z0-9./^µμ-]*)/i},
+  {key:'tsh',label:'TSH',re:/\b(?:s\.?\s*t\.?\s*s\.?\s*h\.?|t\.?\s*s\.?\s*h\.?)\b(?:\s*estimation)?\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*([a-z0-9./^µμ-]*)/i},
+  {key:'glucose',label:'Blood glucose',re:/\b(?:random\s*)?(?:blood\s*)?glucose\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*([a-z0-9./^µμ-]*)/i},
+  {key:'fhr',label:'Fetal heart rate',re:/\b(?:fetal\s*)?(?:heart\s*rate|hr|fhr)\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(bpm|beats?\/min)?/i},
+  {key:'crl',label:'CRL',re:/\bcrl\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(mm|cm)?/i},
+  {key:'weight',label:'Weight',re:/\bweight\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(kg|kgs)?/i},
+  {key:'height',label:'Height',re:/\bheight\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(cm|m)?/i},
+  {key:'bmi',label:'BMI',re:/\bbmi\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i},
+  {key:'pulse',label:'Pulse',re:/\bpulse\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(\/min|bpm)?/i},
+  {key:'spo2',label:'SpO2',re:/\bspo\s*2\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(%)?/i},
+  {key:'nt',label:'Nuchal translucency (NT)',re:/\bnt\b\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)\s*(mm)?/i}
+ ];
+ const found=[];
+ String(item.text||'').split(/\r?\n/).forEach((line,lineIndex)=>{
+  definitions.forEach(def=>{
+   const match=line.match(def.re);if(!match)return;
+   const raw=String(match[0]||'').replace(/\s+/g,' ').trim();
+   const value=Number(String(match[1]||'').replace(',','.'));
+   found.push({key:def.key,label:def.label,raw:raw||line.trim(),value:Number.isFinite(value)?value:null,unit:String(match[2]||'').trim(),line:line.trim(),lineNumber:lineIndex+1});
+  });
+  const bp=line.match(/\b(?:bp|blood pressure)\b\s*[:=]?\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*(mmhg)?/i);
+  if(bp)found.push({key:'blood_pressure',label:'Blood pressure',raw:bp[0].replace(/\s+/g,' ').trim(),value:null,unit:String(bp[3]||'mmHg'),line:line.trim(),lineNumber:lineIndex+1});
+  const ga=line.match(/\b(?:ga|gestational age)\b\s*[:=]?\s*(\d{1,2}\s*w(?:ks?)?\s*\d{0,2}\s*d?)/i);
+  if(ga)found.push({key:'gestational_age',label:'Gestational age',raw:ga[0].replace(/\s+/g,' ').trim(),value:null,unit:'',line:line.trim(),lineNumber:lineIndex+1});
+  const dateMatch=line.match(/\b(edd|lmp)\b\s*[:=]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
+  if(dateMatch)found.push({key:dateMatch[1].toLowerCase(),label:dateMatch[1].toUpperCase(),raw:dateMatch[0].replace(/\s+/g,' ').trim(),value:null,unit:'date',line:line.trim(),lineNumber:lineIndex+1});
+ });
+ const seen=new Set();
+ return found.filter(v=>{const k=v.key+'|'+v.raw.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).map(v=>({...v,patientId:item.patientId||item.patientCode||item.patientName||'unknown',patientName:item.patientName||'Patient',patientCode:item.patientCode||'',docName:item.name||'Document',docDate:item.date||'Date unknown',category:item.category||'Other',confidence:item.confidence}));
+}
 function buildComprehensiveClinicDocumentReport(){
  const items=comparativeClinicalOcrItems.slice(),host=$('clinicDocumentReportOutput');if(!host)return;
  if(!items.length){host.innerHTML='<div class="empty">No documents have been extracted in this session yet. Extract clinical reports for each patient to include them.</div>';return}
  const byPatient=new Map(),byCategory=new Map();
  items.forEach(x=>{const key=x.patientId||x.patientCode||x.patientName||'Unknown';if(!byPatient.has(key))byPatient.set(key,{name:x.patientName||'Patient',code:x.patientCode||'',docs:[]});byPatient.get(key).docs.push(x);const cat=x.category||'Other';byCategory.set(cat,(byCategory.get(cat)||0)+1)});
  const low=items.filter(x=>Number.isFinite(Number(x.confidence))&&Number(x.confidence)<80);
- const summary='<div class="grid"><div class="card"><div class="muted small">Patients represented</div><div class="stat">'+byPatient.size+'</div></div><div class="card"><div class="muted small">Documents extracted</div><div class="stat">'+items.length+'</div></div><div class="card"><div class="muted small">Low-confidence OCR</div><div class="stat">'+low.length+'</div></div></div>';
+ const candidates=items.flatMap(extractClinicalCandidateValues);
+ const patientNameFor=id=>{const p=byPatient.get(id);return p?(p.code?p.code+' · ':'')+p.name:'Patient'};
+ const summary='<div class="grid"><div class="card"><div class="muted small">Patients represented</div><div class="stat">'+byPatient.size+'</div></div><div class="card"><div class="muted small">Documents extracted</div><div class="stat">'+items.length+'</div></div><div class="card"><div class="muted small">Low-confidence OCR</div><div class="stat">'+low.length+'</div></div><div class="card"><div class="muted small">Candidate values detected</div><div class="stat">'+candidates.length+'</div></div></div>';
  const categories='<h3>Document category breakdown</h3><div class="tablewrap"><table><thead><tr><th>Category</th><th>Documents</th></tr></thead><tbody>'+[...byCategory].map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join('')+'</tbody></table></div>';
  const patientsHtml='<h3>Patient-wise document index</h3>'+[...byPatient.values()].map(p=>'<div class="card" style="margin:8px 0"><strong>'+esc(p.code+' · '+p.name)+'</strong><div class="small muted">'+p.docs.length+' document(s)</div><ul>'+p.docs.map(x=>'<li>'+esc(x.date+' · '+x.category+' · '+x.name)+' — OCR '+(Number.isFinite(Number(x.confidence))?Number(x.confidence).toFixed(1)+'%':'unavailable')+'</li>').join('')+'</ul></div>').join('');
- const details='<h3>Extracted source documents</h3>'+items.map((x,i)=>'<details class="card" style="margin:8px 0"><summary><strong>'+esc((i+1)+'. '+(x.patientCode||x.patientName)+' · '+x.name)+'</strong><div class="small muted">'+esc(x.date+' · '+x.category+' · '+x.type)+'</div></summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 inherit;margin-top:10px">'+esc(x.text||'[No text]')+'</pre></details>').join('');
- const warning='<p class="small muted">Only documents extracted in this browser session are included. Repeat extraction for each patient for a broader clinic report. Identity documents are excluded. OCR may misread values; this is a source index and transcription summary, not diagnosis or treatment advice. Verify all values against original documents.</p>';
- host.innerHTML='<div id="clinicDocumentPrintable"><h2>Comprehensive clinic document report</h2><div class="small muted">Generated '+esc(new Date().toLocaleString())+'</div>'+summary+categories+patientsHtml+details+warning+'</div>';
+ const candidateRows=candidates.map(v=>'<tr><td>'+esc(patientNameFor(v.patientId))+'</td><td>'+esc(v.label)+'</td><td><strong>'+esc(v.raw)+'</strong></td><td>'+esc(v.docDate)+'</td><td>'+esc(v.docName)+'</td><td>'+esc(Number.isFinite(Number(v.confidence))?Number(v.confidence).toFixed(1)+'%':'Not available')+'</td><td><span class="badge" style="background:#fff4dc;color:#815500">Unverified OCR</span></td></tr>').join('');
+ const candidateSection='<h3>Structured clinical value index — verification required</h3><p class="small muted">These are text-pattern matches from OCR, not confirmed measurements. The exact matched text and source document are shown. No value is labelled normal or abnormal. Confirm every item against the original report before clinical use.</p>'+(candidates.length?'<div class="tablewrap"><table><thead><tr><th>Patient</th><th>Parameter</th><th>OCR text match</th><th>Document date</th><th>Source document</th><th>OCR confidence</th><th>Review status</th></tr></thead><tbody>'+candidateRows+'</tbody></table></div>':'<div class="empty">No structured value patterns were detected. Review the verbatim source OCR below.</div>');
+ const trendGroups=new Map();
+ candidates.filter(v=>v.value!==null).forEach(v=>{const unit=String(v.unit||'').toLowerCase().replace(/\s+/g,'');const key=v.patientId+'|'+v.key+'|'+unit;if(!trendGroups.has(key))trendGroups.set(key,[]);trendGroups.get(key).push(v)});
+ const trendRows=[];
+ trendGroups.forEach(group=>{
+  if(group.length<2)return;
+  group.sort((a,b)=>{const da=new Date(a.docDate).getTime(),db=new Date(b.docDate).getTime();return (Number.isFinite(da)?da:0)-(Number.isFinite(db)?db:0)});
+  const first=group[0],last=group[group.length-1];if(first===last)return;
+  const delta=last.value-first.value;
+  trendRows.push('<tr><td>'+esc(patientNameFor(first.patientId))+'</td><td>'+esc(first.label)+'</td><td>'+esc(first.raw)+'</td><td>'+esc(last.raw)+'</td><td>'+esc((delta>0?'+':'')+String(Number(delta.toFixed(4)))+(first.unit?' '+first.unit:''))+'</td><td>'+esc(first.docDate+' → '+last.docDate)+'</td><td>'+esc(first.docName+' → '+last.docName)+'</td></tr>');
+ });
+ const trends='<h3>Same-patient numeric comparison</h3><p class="small muted">Calculated only when the same parameter label was detected more than once for the same patient and the extracted unit text matches. This is a mathematical difference only, not a clinical interpretation. OCR mismatches can create false comparisons.</p>'+(trendRows.length?'<div class="tablewrap"><table><thead><tr><th>Patient</th><th>Parameter</th><th>Earlier OCR match</th><th>Later OCR match</th><th>Difference</th><th>Dates</th><th>Source documents</th></tr></thead><tbody>'+trendRows.join('')+'</tbody></table></div>':'<div class="empty">No repeat numeric parameter with matching units was detected in the extracted documents.</div>');
+ const details='<h3>Extracted source documents — verbatim OCR</h3>'+items.map((x,i)=>'<details class="card" style="margin:8px 0"><summary><strong>'+esc((i+1)+'. '+(x.patientCode||x.patientName)+' · '+x.name)+'</strong><div class="small muted">'+esc(x.date+' · '+x.category+' · '+x.type)+' · OCR '+(Number.isFinite(Number(x.confidence))?Number(x.confidence).toFixed(1)+'%':'not available')+'</div></summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 inherit;margin-top:10px">'+esc(x.text||'[No text]')+'</pre></details>').join('');
+ const warning='<div class="card" style="margin-top:12px;border-left:4px solid #b7791f"><strong>Clinical and data-quality safeguards</strong><ul><li>Only documents extracted in this browser session are included. Extract each patient’s documents for a broader clinic report.</li><li>Identity documents are excluded from OCR selection and this report.</li><li>Every structured value is an unverified OCR text match. OCR confidence is not the probability that a clinical value is correct.</li><li>Missing values are not normal results. Differences are not labelled clinically significant.</li><li>Do not use this report to diagnose, prescribe or make treatment decisions. Verify original reports, units, dates, reference ranges and patient context; clinician review is required.</li><li>Nothing is written back to Supabase. Original uploads and patient records remain unchanged.</li></ul></div>';
+ host.innerHTML='<div id="clinicDocumentPrintable"><h2>Comprehensive clinic document report</h2><div class="small muted">Generated '+esc(new Date().toLocaleString())+' · '+items.length+' extracted document(s) across '+byPatient.size+' patient(s)</div>'+summary+categories+patientsHtml+candidateSection+trends+details+warning+'</div>';
  $('printClinicDocumentReport').disabled=false;$('downloadClinicDocumentReport').disabled=false;
 }
 $('buildClinicDocumentReport').addEventListener('click',buildComprehensiveClinicDocumentReport);
