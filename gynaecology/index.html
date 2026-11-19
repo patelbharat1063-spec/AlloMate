@@ -1319,7 +1319,7 @@ function renderSelectedPatientAnalytics(){
  const events=[];
  const push=(rows,date,title,detail)=>rows.forEach(x=>events.push({date:x[date]||x.created_at||'',title,detail:detail(x)}));
  push(ap,'appointment_at','Appointment',x=>(x.appointment_type||'Visit')+' · '+(x.status||'status not recorded'));
- push(pg,'lmp_date','Pregnancy','EDD '+(pg[0]?.edd_date||'not recorded')+' · status '+(pg[0]?.status||'not recorded')+' · recorded risk '+(pg[0]?.risk_level||'not assessed'));
+ push(pg,'lmp_date','Pregnancy',x=>'EDD '+(x.edd_date||'not recorded')+' · status '+(x.status||'not recorded')+' · recorded risk '+(x.risk_level||'not assessed'));
  push(anc,'visit_date','ANC visit',x=>'GA '+(x.gestational_weeks??'—')+' weeks · BP '+(x.bp_systolic??'—')+'/'+(x.bp_diastolic??'—')+' · '+(x.assessment||'No assessment text'));
  push(scans,'scan_date','Ultrasound',x=>(x.scan_type||'Scan')+' · '+(x.impression||'No impression text')+' · review '+(x.review_status||'not recorded'));
  push(inv,'result_date','Investigation',x=>(x.test_name||x.investigation_name||'Test')+' · '+(x.result||x.result_text||x.status||'See original result'));
