@@ -12,9 +12,9 @@
         document.addEventListener('DOMContentLoaded',function(){if(!box.isConnected)document.body.appendChild(box)});
         if(document.body)document.body.appendChild(box);
       }
-      box.textContent='Clinic app JavaScript error\\n'+String(message||'Unknown error')+
-        (source?'\\nFile: '+source:'')+(line?'\\nLine: '+line:'')+(column?'\\nColumn: '+column:'')+
-        (error&&error.stack?'\\n\\n'+error.stack:'');
+      box.textContent='Clinic app JavaScript error\n'+String(message||'Unknown error')+
+        (source?'\nFile: '+source:'')+(line?'\nLine: '+line:'')+(column?'\nColumn: '+column:'')+
+        (error&&error.stack?'\n\n'+error.stack:'');
     }catch(_){}
   }
   window.addEventListener('error',function(e){report(e.message,e.filename,e.lineno,e.colno,e.error)});
@@ -1050,7 +1050,7 @@ const CHATGPT_OBSTETRIC_RESEARCH_PROMPT = [
 '## 9. Final report structure','Cover/confidentiality; executive summary; de-identified patient/pregnancy context; document inventory; chronological timeline; detailed ultrasound analysis and images; laboratory analysis and images; integrated interpretation; evidence-based research discussion; guidelines/references; findings requiring clinician review; missing information/limitations; questions for next consultation; conclusion; complete source-document index.','',
 '## 10. Accuracy, privacy and safety','Exclude identity documents, Aadhaar/PAN/passport numbers and unnecessary identifiers. De-identify patient labels. Preserve exact values/units. If OCR conflicts with image, visually verify and document discrepancy. Mark unreadable values "Not clearly readable — verification required". Label OCR unverified until checked. Avoid duplicate counting. Label calculations and assumptions. Do not diagnose, prescribe or replace treating clinician. For urgent concerns advise prompt direct assessment by clinical team.','',
 '## 11. PDF deliverable','Create a polished A4 PDF with contents, page numbers, readable tables/charts, high-resolution original report images, captions, in-text citations, complete references and confidentiality footer. Do not omit attachments; list any file that could not be read. Cross-check every attachment and source-trace every clinical value. The report is for review by the treating obstetrician.'
-].join('\\n');
+].join('\n');
 
 async function ensureZipLibrary(){
  if(window.JSZip)return window.JSZip;
@@ -1069,15 +1069,15 @@ $('copyChatGptResearchPrompt')?.addEventListener('click',async()=>{const s=$('ch
 $('prepareChatGptResearchPack')?.addEventListener('click',async()=>{
  const id=$('documentPatientFilter')?.value,patient=(patients||[]).find(p=>p.id===id),status=$('chatGptPackStatus'),button=$('prepareChatGptResearchPack');
  if(!id||!patient){if(status)status.textContent='Select a patient first.';return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===id&&!isIdentityAttachment(d)&&(String(d.mime_type||'').toLowerCase().startsWith('image/')||String(d.mime_type||'').toLowerCase().includes('pdf')||/\\.pdf$/i.test(d.original_filename||''))).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
+ const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===id&&!isIdentityAttachment(d)&&(String(d.mime_type||'').toLowerCase().startsWith('image/')||String(d.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(d.original_filename||''))).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
  if(!docs.length){if(status)status.textContent='No clinical PDF/image attachments found. Refresh the patient document list and retry.';return}
  button.disabled=true;
  try{
   const JSZip=await ensureZipLibrary(),zip=new JSZip(),folder=zip.folder('Original clinical reports'),used=new Set();let success=0,failed=[];
   for(let i=0;i<docs.length;i++){const d=docs[i],label=d.original_filename||('clinical_report_'+(i+1));if(status)status.textContent='Downloading original report '+(i+1)+' of '+docs.length+': '+label;
    const {data,error}=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);if(error||!data){failed.push(label+': '+(error?.message||'No file returned'));continue}
-   let filename=researchSafeName(label);if(!/\\.[a-z0-9]{2,5}$/i.test(filename))filename+=(String(d.mime_type||'').includes('pdf')?'.pdf':'.jpg');
-   let unique=filename,n=2;while(used.has(unique.toLowerCase()))unique=filename.replace(/(\\.[^.]+)$/,'_'+n+++'$1');used.add(unique.toLowerCase());
+   let filename=researchSafeName(label);if(!/\.[a-z0-9]{2,5}$/i.test(filename))filename+=(String(d.mime_type||'').includes('pdf')?'.pdf':'.jpg');
+   let unique=filename,n=2;while(used.has(unique.toLowerCase()))unique=filename.replace(/(\.[^.]+)$/,'_'+n+++'$1');used.add(unique.toLowerCase());
    folder.file(String(i+1).padStart(2,'0')+'_'+unique,data);success++;
   }
   if(!success)throw new Error('None of the original clinical files could be downloaded. '+failed.join(' | '));
@@ -1085,7 +1085,7 @@ $('prepareChatGptResearchPack')?.addEventListener('click',async()=>{
   zip.file('PATIENT_CONTEXT.json',JSON.stringify(researchPatientContext(id),null,2));
   const ocr=comparativeClinicalOcrItems.filter(x=>x.patientId===id);if(ocr.length)zip.file('OCR_TRANSCRIPT_UNVERIFIED.txt',buildOcrReport(patient,ocr));
   zip.file('PACK_README.txt','Original clinical reports and ChatGPT research prompt. Identity documents are excluded. OCR transcript, if present, is unverified and must be checked against originals. Patient context contains existing clinic records available in this browser session. Upload only to an account/workspace approved for this patient information. Do not share publicly.');
-  if(failed.length)zip.file('DOWNLOAD_WARNINGS.txt','Some files could not be downloaded:\\n'+failed.join('\\n'));
+  if(failed.length)zip.file('DOWNLOAD_WARNINGS.txt','Some files could not be downloaded:\n'+failed.join('\n'));
   if(status)status.textContent='Creating ZIP with '+success+' original report(s)…';
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:4}}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=researchSafeName(patient.patient_code||'patient')+'_obstetric_research_pack.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -1515,7 +1515,7 @@ function renderPatientAnalytics(){
 
 function patientUploadedReportAnalysisHtml(patient){
  const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===patient.id).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
- const eligible=docs.filter(d=>{const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'');return (mime.startsWith('image/')||mime.includes('pdf')||/\\.pdf$/i.test(name))&&!isIdentityAttachment(d)});
+ const eligible=docs.filter(d=>{const mime=String(d.mime_type||'').toLowerCase(),name=String(d.original_filename||'');return (mime.startsWith('image/')||mime.includes('pdf')||/\.pdf$/i.test(name))&&!isIdentityAttachment(d)});
  const extracted=comparativeClinicalOcrItems.filter(x=>x.patientId===patient.id);
  const candidates=extracted.flatMap(extractClinicalCandidateValues);
  const docsHtml=docs.length?'<div class="tablewrap"><table><thead><tr><th>Uploaded report / file</th><th>Category</th><th>Uploaded</th><th>OCR status</th></tr></thead><tbody>'+docs.map(d=>{
