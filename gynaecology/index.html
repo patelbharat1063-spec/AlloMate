@@ -1054,8 +1054,22 @@ const CHATGPT_OBSTETRIC_RESEARCH_PROMPT = [
 
 async function ensureZipLibrary(){
  if(window.JSZip)return window.JSZip;
- await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Could not load ZIP creator. Check internet access and retry.'));document.head.appendChild(s)});
- if(!window.JSZip)throw new Error('ZIP creator did not initialise.');return window.JSZip;
+ const sources=[
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+ ];
+ let lastError;
+ for(const src of sources){
+  try{
+   await new Promise((resolve,reject)=>{
+    const s=document.createElement('script');s.src=src;s.async=true;
+    s.onload=()=>resolve();s.onerror=()=>{s.remove();reject(new Error('ZIP library unavailable from '+src))};
+    document.head.appendChild(s);
+   });
+   if(window.JSZip)return window.JSZip;
+  }catch(e){lastError=e}
+ }
+ throw new Error('Could not load the ZIP creator. Check internet access and retry. '+(lastError?.message||''));
 }
 function researchSafeName(v){return String(v||'document').normalize('NFKD').replace(/[^a-z0-9._-]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,100)||'document'}
 function researchPatientContext(id){
@@ -1067,34 +1081,57 @@ function updateResearchPackAvailability(){const id=$('documentPatientFilter')?.v
 $('documentPatientFilter')?.addEventListener('change',updateResearchPackAvailability);
 $('copyChatGptResearchPrompt')?.addEventListener('click',async()=>{const s=$('chatGptPackStatus');try{await navigator.clipboard.writeText(CHATGPT_OBSTETRIC_RESEARCH_PROMPT);if(s)s.textContent='Complete research prompt copied.'}catch(e){const p=$('chatGptResearchPrompt');p.focus();p.select();if(s)s.textContent='Prompt selected. Use Copy from your device menu.'}});
 $('prepareChatGptResearchPack')?.addEventListener('click',async()=>{
- const id=$('documentPatientFilter')?.value,patient=(patients||[]).find(p=>p.id===id),status=$('chatGptPackStatus'),button=$('prepareChatGptResearchPack');
+ const id=$('documentPatientFilter')?.value,patient=(patients||[]).find(p=>String(p.id)===String(id)),status=$('chatGptPackStatus'),button=$('prepareChatGptResearchPack');
  if(!id||!patient){if(status)status.textContent='Select a patient first.';return}
- const docs=(moduleData.gyn_attachments||[]).filter(d=>d.patient_id===id&&!isIdentityAttachment(d)&&(String(d.mime_type||'').toLowerCase().startsWith('image/')||String(d.mime_type||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(d.original_filename||''))).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
- if(!docs.length){if(status)status.textContent='No clinical PDF/image attachments found. Refresh the patient document list and retry.';return}
  button.disabled=true;
  try{
+  if(!db||!clinic?.id)throw new Error('Your clinic session is not ready. Sign in again and retry.');
+  if(status)status.textContent='Refreshing this patient’s document list from secure storage…';
+  const query=await db.from('gyn_attachments').select('*').eq('clinic_id',clinic.id).eq('patient_id',id).order('created_at',{ascending:true});
+  if(query.error)throw new Error('Could not load patient documents: '+query.error.message);
+  const allDocs=query.data||[];
+  moduleData.gyn_attachments=(moduleData.gyn_attachments||[]).filter(d=>String(d.patient_id)!==String(id)).concat(allDocs);
+  const docs=allDocs.filter(d=>!isIdentityAttachment(d)&&d.storage_path&&(
+   String(d.mime_type||'').toLowerCase().startsWith('image/')||
+   String(d.mime_type||'').toLowerCase().includes('pdf')||
+   /\.pdf$/i.test(d.original_filename||'')
+  )).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||new Date(a.created_at||0)-new Date(b.created_at||0));
+  if(!docs.length)throw new Error('No clinical PDF/image files with storage paths were found for this patient. Use “Refresh OCR document list” and check that the reports are linked to this patient.');
+  if(status)status.textContent='Loading ZIP tool and downloading '+docs.length+' original clinical file(s)…';
   const JSZip=await ensureZipLibrary(),zip=new JSZip(),folder=zip.folder('Original clinical reports'),used=new Set();let success=0,failed=[];
-  for(let i=0;i<docs.length;i++){const d=docs[i],label=d.original_filename||('clinical_report_'+(i+1));if(status)status.textContent='Downloading original report '+(i+1)+' of '+docs.length+': '+label;
-   const {data,error}=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);if(error||!data){failed.push(label+': '+(error?.message||'No file returned'));continue}
-   let filename=researchSafeName(label);if(!/\.[a-z0-9]{2,5}$/i.test(filename))filename+=(String(d.mime_type||'').includes('pdf')?'.pdf':'.jpg');
-   let unique=filename,n=2;while(used.has(unique.toLowerCase()))unique=filename.replace(/(\.[^.]+)$/,'_'+n+++'$1');used.add(unique.toLowerCase());
-   folder.file(String(i+1).padStart(2,'0')+'_'+unique,data);success++;
+  for(let i=0;i<docs.length;i++){
+   const d=docs[i],label=d.original_filename||('clinical_report_'+(i+1));
+   if(status)status.textContent='Downloading original report '+(i+1)+' of '+docs.length+': '+label;
+   try{
+    const result=await db.storage.from(d.storage_bucket||'gyn-private').download(d.storage_path);
+    if(result.error||!result.data)throw new Error(result.error?.message||'No file returned');
+    let filename=researchSafeName(label);
+    if(!/\.[a-z0-9]{2,5}$/i.test(filename))filename+=(String(d.mime_type||'').toLowerCase().includes('pdf')?'.pdf':'.jpg');
+    let unique=filename,n=2;while(used.has(unique.toLowerCase()))unique=filename.replace(/(\.[^.]+)$/,'_'+n+++'$1');
+    used.add(unique.toLowerCase());folder.file(String(i+1).padStart(2,'0')+'_'+unique,result.data);success++;
+   }catch(fileError){failed.push(label+': '+(fileError.message||String(fileError)))}
   }
   if(!success)throw new Error('None of the original clinical files could be downloaded. '+failed.join(' | '));
   zip.file('CHATGPT_RESEARCH_PROMPT.md',CHATGPT_OBSTETRIC_RESEARCH_PROMPT);
   zip.file('PATIENT_CONTEXT.json',JSON.stringify(researchPatientContext(id),null,2));
-  const ocr=comparativeClinicalOcrItems.filter(x=>x.patientId===id);if(ocr.length)zip.file('OCR_TRANSCRIPT_UNVERIFIED.txt',buildOcrReport(patient,ocr));
+  const ocr=(comparativeClinicalOcrItems||[]).filter(x=>String(x.patientId)===String(id));
+  if(ocr.length)zip.file('OCR_TRANSCRIPT_UNVERIFIED.txt',buildOcrReport(patient,ocr));
   zip.file('PACK_README.txt','Original clinical reports and ChatGPT research prompt. Identity documents are excluded. OCR transcript, if present, is unverified and must be checked against originals. Patient context contains existing clinic records available in this browser session. Upload only to an account/workspace approved for this patient information. Do not share publicly.');
-  if(failed.length)zip.file('DOWNLOAD_WARNINGS.txt','Some files could not be downloaded:\n'+failed.join('\n'));
-  if(status)status.textContent='Creating ZIP with '+success+' original report(s)…';
-  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:4}}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=researchSafeName(patient.patient_code||'patient')+'_obstetric_research_pack.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-  if(status)status.textContent='Research pack ready: '+success+' original clinical file(s), prompt and patient context included.'+(failed.length?' '+failed.length+' file(s) failed; see DOWNLOAD_WARNINGS.txt.':'');
+  if(failed.length)zip.file('DOWNLOAD_WARNINGS.txt','Some files could not be downloaded:\\n'+failed.join('\\n'));
+  if(status)status.textContent='Compressing '+success+' original report(s) into ZIP…';
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:3}});
+  const url=URL.createObjectURL(blob),filename=researchSafeName(patient.patient_code||'patient')+'_obstetric_research_pack.zip';
+  if(status){
+   status.textContent='ZIP is ready ('+(Math.round(blob.size/1024))+' KB). Tap the download link below.';
+   const link=document.createElement('a');link.href=url;link.download=filename;link.textContent='Tap here to download the research ZIP';link.className='btn';link.style.display='inline-block';link.style.marginTop='8px';link.style.padding='10px 14px';link.style.textDecoration='none';link.style.color='white';link.style.background='#176b5b';link.style.borderRadius='8px';
+   status.appendChild(document.createElement('br'));status.appendChild(link);
+   if(failed.length){const warning=document.createElement('div');warning.className='small muted';warning.textContent=failed.length+' file(s) could not be included. See DOWNLOAD_WARNINGS.txt inside the ZIP.';status.appendChild(warning)}
+  }
+  setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
  }catch(e){if(status)status.textContent='Could not prepare research pack: '+(e.message||String(e))}
  finally{button.disabled=false}
 });
 updateResearchPackAvailability();
-
 // Patient document OCR: browser-side processing of files downloaded through the authenticated Supabase client.
 function isIdentityAttachment(d){return ['aadhaar_masked','pan_card','voter_id','passport','driving_license','address_proof','insurance_card','other_patient_document'].includes(String(d.entity_type||'').toLowerCase())}
 async function refreshOcrDocuments(){
