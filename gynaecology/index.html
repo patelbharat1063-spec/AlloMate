@@ -1485,17 +1485,29 @@ function renderSelectedPatientAnalytics(){
  box.insertAdjacentHTML('beforeend',patientUploadedReportAnalysisHtml(p));
 }
 
-$('analyticsPatientDetail').addEventListener('click',e=>{
+$('analyticsPatientDetail').addEventListener('click',async e=>{
  const btn=e.target.closest('#analyzeAllUploadedReports');if(!btn)return;
  const patientId=$('analyticsPatient').value,patient=patients.find(x=>x.id===patientId);
  if(!patient){alert('Select a patient first.');return}
  const filter=$('documentPatientFilter');if(!filter){alert('The patient document list is unavailable.');return}
- filter.value=patientId;renderPatientDocuments();
- const checks=[...document.querySelectorAll('.patient-ocr-check[data-supported="1"][data-sensitive="0"]')];
- checks.forEach(x=>x.checked=true);
- if(!checks.length){const status=$('analyticsOcrRunStatus');if(status)status.textContent='No supported clinical PDF or image reports are available for OCR.';return}
- const status=$('analyticsOcrRunStatus');if(status)status.textContent='Starting OCR for '+checks.length+' clinical report(s)…';
- $('runPatientOcr').click();
+ const status=$('analyticsOcrRunStatus');
+ btn.disabled=true;
+ if(status)status.textContent='Loading the selected patient’s uploaded reports…';
+ try{
+  filter.value=patientId;
+  // Wait for the authenticated attachment query and checkbox rendering before selecting files.
+  await refreshOcrDocuments();
+  const checks=[...document.querySelectorAll('#ocrDocumentChoices .patient-ocr-check[data-supported="1"][data-sensitive="0"]')];
+  checks.forEach(x=>{x.checked=true;x.dispatchEvent(new Event('change',{bubbles:true}))});
+  if(!checks.length){
+   if(status)status.textContent='No supported clinical PDF or image reports were found. Check the document list and file types.';
+   return;
+  }
+  if(status)status.textContent='Starting OCR for '+checks.length+' clinical report(s)…';
+  $('runPatientOcr').click();
+ }catch(error){
+  if(status)status.textContent='Could not load reports for OCR: '+(error.message||String(error));
+ }finally{btn.disabled=false}
 });
 
 $('analyticsPatient').addEventListener('change',renderSelectedPatientAnalytics);
