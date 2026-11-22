@@ -32,7 +32,8 @@
 <section id="loginPanel" class="panel login"><h2>Secure clinic login</h2><p class="muted">Sign in with your registered clinic account.</p><form id="loginForm"><div style="margin:12px 0"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div style="margin:12px 0"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><button class="btn" style="width:100%">Sign in</button></form><div id="loginMsg" aria-live="polite"></div><p class="small muted">Access is controlled by Supabase authentication and clinic membership. No public patient registration.</p></section>
 <section id="app" class="hidden"><div id="appStatus" class="panel hidden" style="margin-bottom:14px"><div id="appStatusMsg"></div><button id="retryClinicLoad" class="btn secondary" type="button">Retry loading clinic</button></div>
 <div class="row between"><div><strong id="clinicName">Clinic</strong><div class="muted small" id="roleLabel"></div></div><span class="pill">Cloud database connected</span></div>
-<div class="nav" role="tablist"><button type="button" class="active" data-tab="dashboard">Dashboard</button><button type="button" data-tab="patients">Patients</button><button type="button" data-tab="appointments">Appointments</button><button type="button" data-tab="pregnancy">Pregnancy & ANC</button><button type="button" data-tab="highrisk">High-risk monitoring</button><button type="button" data-tab="clinicalsafety">Clinical safety review</button><button type="button" data-tab="clinical">Clinical records</button><button type="button" data-tab="billing">Billing</button><button type="button" data-tab="women">Women’s health</button><button type="button" data-tab="fertility">Fertility / IVF</button><button type="button" data-tab="labour">Labour & newborn</button><button type="button" data-tab="postnatal">Postnatal & consent</button><button type="button" data-tab="operations">Clinic operations</button><button type="button" data-tab="theatre">OT & procedures</button><button type="button" data-tab="reports">Reports & documents</button><button type="button" data-tab="analytics">Patient analysis</button></div>
+<div class="nav" role="tablist"><button type="button" class="active" data-tab="dashboard">Dashboard</button><button type="button" data-tab="patients">Patients</button><button type="button" data-tab="appointments">Appointments</button><button type="button" data-tab="pregnancy">Pregnancy & ANC</button><button type="button" data-tab="highrisk">High-risk monitoring</button><button type="button" data-tab="clinicalsafety">Clinical safety review</button><button type="button" data-tab="clinical">Clinical records</button><button type="button" data-tab="billing">Billing</button><button type="button" data-tab="women">Women’s health</button><button type="button" data-tab="fertility">Fertility / IVF</button><button type="button" data-tab="labour">Labour & newborn</button><button type="button" data-tab="postnatal">Postnatal & consent</button><button type="button" data-tab="operations">Clinic operations</button><button type="button" data-tab="theatre">OT & procedures</button><button type="button" data-tab="reports">Reports & documents</button><button type="button" data-tab="analytics">Patient analysis</button><button type="button" data-tab="aimissing">AI missing data</button></div>
+<section id="aimissing" class="section"><div class="panel" style="margin-top:15px"><div class="row between"><div><h2>AI-assisted missing data review</h2><p class="small muted">Scan every clinical module for this patient, or run a clinic-wide scan patient by patient. AI may suggest only values supported by another saved record or high-confidence OCR text from that patient’s uploaded reports.</p></div><span class="pill">Clinician approval required</span></div><div class="fields" style="margin-top:12px"><div class="field"><label for="aiMissingPatient">Patient</label><select id="aiMissingPatient"><option value="">Select patient</option></select></div><div class="field"><label>Scan scope</label><div class="row"><button class="btn" id="aiScanSelected" type="button">Scan selected patient</button><button class="btn secondary" id="aiScanAll" type="button">Scan all patients</button></div></div></div><div id="aiMissingStatus" class="small muted" style="margin-top:12px" aria-live="polite">Choose a patient to begin. Scanning creates suggestions only; it does not change clinical records.</div></div><div class="panel" style="margin-top:14px"><div class="row between"><h2>Pending suggestions</h2><button class="btn secondary" type="button" id="aiRefreshSuggestions">Refresh</button></div><p class="small muted">Review the proposed value and exact source excerpt. Approve, edit before approval, or reject. Only clinic owners and doctors can approve.</p><div id="aiPendingSuggestions"><div class="empty">No suggestions loaded.</div></div></div><div class="panel" style="margin-top:14px"><h2>AI-filled audit history</h2><p class="small muted">Accepted and edited values remain listed here with the reviewer, source and approval time. This is the permanent AI-filled marker; the original record is not overwritten unless its field is still blank at approval time.</p><div id="aiAcceptedHistory"><div class="empty">No AI-filled values yet.</div></div></div></section>
 <section id="dashboard" class="section active"><div class="panel" style="margin-top:15px">
  <div class="row between"><div><h2>Maternal care overview</h2><p class="small muted">Pregnancy progress and recent recorded events, consolidated from existing clinic records.</p></div><span class="pill">Live record view</span></div>
  <div id="maternalOverviewCards" class="grid"></div>
@@ -1669,6 +1670,63 @@ const bootWithPatientAnalytics=boot;
 boot=async function(){await bootWithPatientAnalytics();if(user&&clinic)renderPatientAnalytics()};
 
 
+
+
+async function refreshAiMissingPatients(){
+ const sel=$('aiMissingPatient');if(!sel)return;const prev=sel.value;
+ sel.innerHTML='<option value="">Select patient</option>'+patients.map(p=>'<option value="'+esc(p.id)+'">'+esc((p.patient_code||'')+' · '+p.full_name)+'</option>').join('');
+ if(prev&&patients.some(p=>p.id===prev))sel.value=prev;
+}
+async function renderAiMissingSuggestions(){
+ if(!clinic)return;
+ const box=$('aiPendingSuggestions'),history=$('aiAcceptedHistory');if(!box||!history)return;
+ box.innerHTML='<div class="muted">Loading suggestions…</div>';history.innerHTML='<div class="muted">Loading audit history…</div>';
+ const {data,error}=await db.from('gyn_ai_field_suggestions').select('*').eq('clinic_id',clinic.id).order('created_at',{ascending:false}).limit(300);
+ if(error){box.innerHTML='<div class="msg err">'+esc(error.message)+'</div>';history.innerHTML='';return}
+ const rows=data||[],pending=rows.filter(x=>x.status==='suggested'),accepted=rows.filter(x=>['accepted','edited'].includes(x.status));
+ const canApprove=['owner','doctor'].includes(role);
+ box.innerHTML=pending.length?pending.map(x=>{
+  const patient=patients.find(p=>p.id===x.patient_id),val=typeof x.proposed_value==='string'?x.proposed_value:JSON.stringify(x.proposed_value);
+  return '<div class="card" style="margin:10px 0"><div class="row between"><strong>'+esc(patient?.full_name||'Patient')+' · '+esc(patient?.patient_code||'')+'</strong><span class="pill">Suggested · '+Math.round(Number(x.confidence||0)*100)+'% confidence</span></div><div class="small muted">'+esc(x.table_name)+'.'+esc(x.field_name)+' · '+esc(x.record_id)+'</div><label style="margin-top:8px">Proposed value — edit if needed</label><textarea data-ai-edit="'+esc(x.id)+'">'+esc(val)+'</textarea><div class="small" style="margin-top:8px"><strong>Source:</strong> '+esc(x.source_table||'')+(x.source_record_id?' · '+esc(x.source_record_id):'')+'</div><blockquote style="margin:8px 0;padding:8px 12px;border-left:3px solid var(--teal);background:#f7faf8">'+esc(x.source_excerpt||'')+'</blockquote><div class="small muted">'+esc(x.rationale||'')+'</div><div class="row" style="margin-top:10px"><button class="btn" type="button" data-ai-approve="'+esc(x.id)+'" '+(canApprove?'':'disabled')+'>Approve value</button><button class="btn secondary" type="button" data-ai-reject="'+esc(x.id)+'" '+(canApprove?'':'disabled')+'>Reject</button></div></div>'
+ }).join(''):'<div class="empty">No pending suggestions. Scan a patient to check for source-backed missing values.</div>';
+ history.innerHTML=accepted.length?'<div class="tablewrap"><table><thead><tr><th>Patient</th><th>Field</th><th>AI-filled value</th><th>Source</th><th>Reviewed</th><th>Status</th></tr></thead><tbody>'+accepted.map(x=>{const p=patients.find(y=>y.id===x.patient_id);return '<tr><td>'+esc(p?.full_name||'Patient')+'</td><td>'+esc(x.table_name+'.'+x.field_name)+'</td><td><span class="pill">AI-filled</span> '+esc(typeof x.approved_value==='string'?x.approved_value:JSON.stringify(x.approved_value))+'</td><td>'+esc(x.source_table||'')+'<div class="small muted">'+esc(x.source_excerpt||'')+'</div></td><td>'+esc(x.reviewed_at?new Date(x.reviewed_at).toLocaleString():'')+'</td><td>'+esc(x.status)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty">No approved AI-filled values have been recorded.</div>';
+}
+async function runAiMissingScan(patient){
+ const docs=(comparativeClinicalOcrItems||[]).filter(x=>x.patientId===patient.id&&!String(x.text||'').startsWith('[EXTRACTION FAILED:')&&!String(x.text||'').startsWith('[NOT PROCESSED:')).map(x=>({name:x.name,text:x.text,confidence:x.confidence}));
+ const {data,error}=await db.functions.invoke('gyn-ai-missing-fields',{body:{action:'scan',clinic_id:clinic.id,patient_id:patient.id,ocr_documents:docs}});
+ if(error)throw error;if(data?.error)throw new Error(data.error);
+ return Number(data?.suggestions_created||0);
+}
+$('aiScanSelected').addEventListener('click',async()=>{
+ const p=patients.find(x=>x.id===$('aiMissingPatient').value);if(!p){$('aiMissingStatus').textContent='Select a patient first.';return}
+ const b=$('aiScanSelected');b.disabled=true;$('aiMissingStatus').textContent='Scanning all supported modules for '+p.full_name+'…';
+ try{const n=await runAiMissingScan(p);$('aiMissingStatus').textContent='Completed for '+p.full_name+': '+n+' new suggestion(s). Review each item below.';await renderAiMissingSuggestions()}
+ catch(e){$('aiMissingStatus').textContent='Scan failed: '+(e.message||String(e))}
+ finally{b.disabled=false}
+});
+$('aiScanAll').addEventListener('click',async()=>{
+ if(!patients.length){$('aiMissingStatus').textContent='No patients are currently available in the loaded clinic register.';return}
+ if(!confirm('Scan all '+patients.length+' patients? This creates review suggestions only and does not change patient records.'))return;
+ const b=$('aiScanAll');b.disabled=true;$('aiScanSelected').disabled=true;let total=0,failed=0;
+ try{for(let i=0;i<patients.length;i++){const p=patients[i];$('aiMissingStatus').textContent='Scanning patient '+(i+1)+' of '+patients.length+': '+p.full_name+'…';try{total+=await runAiMissingScan(p)}catch(e){failed++}}
+ $('aiMissingStatus').textContent='Clinic scan finished. '+total+' new suggestion(s); '+failed+' patient scan(s) could not be completed. Review the queue.';
+ await renderAiMissingSuggestions()
+ }finally{b.disabled=false;$('aiScanSelected').disabled=false}
+});
+$('aiRefreshSuggestions').addEventListener('click',renderAiMissingSuggestions);
+$('aiPendingSuggestions').addEventListener('click',async e=>{
+ const approve=e.target.closest('[data-ai-approve]'),reject=e.target.closest('[data-ai-reject]');if(!approve&&!reject)return;
+ const id=(approve||reject).dataset.aiApprove||(approve||reject).dataset.aiReject,action=approve?'approve':'reject';
+ if(!['owner','doctor'].includes(role)){alert('Only the clinic owner or doctor can approve or reject.');return}
+ let body={action,clinic_id:clinic.id,suggestion_id:id};
+ if(approve){const input=$('aiPendingSuggestions').querySelector('[data-ai-edit="'+id+'"]');if(!input||!input.value.trim()){alert('Enter a value before approval.');return}body.edited_value=input.value.trim()}
+ (approve||reject).disabled=true;
+ try{const {data,error}=await db.functions.invoke('gyn-ai-missing-fields',{body});if(error)throw error;if(data?.error)throw new Error(data.error);await renderAiMissingSuggestions();$('aiMissingStatus').textContent=action==='approve'?'Value approved and recorded with an AI-filled audit marker.':'Suggestion rejected.'}
+ catch(err){alert('Could not '+action+' suggestion: '+(err.message||String(err)));(approve||reject).disabled=false}
+});
+$('aiMissingPatient').addEventListener('change',()=>{});
+const bootWithAiMissing=boot;
+boot=async function(){await bootWithAiMissing();if(user&&clinic){await refreshAiMissingPatients();await renderAiMissingSuggestions()}};
 
 boot();
 </script></body></html>
