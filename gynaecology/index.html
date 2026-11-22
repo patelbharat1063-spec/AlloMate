@@ -249,7 +249,7 @@
 const SUPABASE_URL='https://elrmnfxmcznszxowgvth.supabase.co';
 const SUPABASE_KEY='sb_publishable_xIMARwNLH_7NAnfiCI3qfw_BlBDfTx0';
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let user=null,clinic=null,role=null,patients=[],appointments=[],pregnancies=[],ancVisits=[],ultrasounds=[],investigations=[],prescriptions=[],highRiskReviews=[],editingPatient=null;
+let user=null,clinic=null,role=null,patients=[],appointments=[],pregnancies=[],pregnancyHistoryRecords=[],ancVisits=[],ultrasounds=[],investigations=[],prescriptions=[],highRiskReviews=[],editingPatient=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const msg=(id,text,error=false)=>{$(id).innerHTML='<div class="msg '+(error?'err':'')+'">'+esc(text)+'</div>'};
@@ -259,7 +259,46 @@ function isoLocal(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleString('en
 function dateOnly(d){return d?new Date(d+'T00:00:00').toLocaleDateString('en-IN'):'—'}
 function ageWeeks(lmp){if(!lmp)return '—';const days=Math.floor((Date.now()-new Date(lmp+'T00:00:00').getTime())/86400000);return days<0?'Check LMP':Math.floor(days/7)+'w '+days%7+'d'}
 async function loadClinic(){const {data:memberships,error:membershipError}=await db.from('gyn_memberships').select('clinic_id,role,is_active').eq('user_id',user.id).eq('is_active',true);if(membershipError)throw new Error('Could not read clinic membership: '+membershipError.message);const membership=(memberships||[]).find(item=>item.clinic_id&&item.role);if(!membership)throw new Error('No active clinic membership is assigned to this account. The owner membership record was not returned.');const {data:clinicData,error:clinicError}=await db.from('gyn_clinics').select('id,clinic_name,timezone').eq('id',membership.clinic_id).single();if(clinicError)throw new Error('Membership found, but clinic profile could not be loaded: '+clinicError.message);clinic=clinicData;role=membership.role;$('clinicName').textContent=clinic.clinic_name;$('roleLabel').textContent='Signed in as '+role+' · '+user.email}
-async function loadAll(){const patientResult=await db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false});if(patientResult.error)throw patientResult.error;const appointmentResult=await db.from('gyn_appointments').select('*').eq('clinic_id',clinic.id).order('appointment_at',{ascending:false}).limit(150);if(appointmentResult.error)throw appointmentResult.error;const pregnancyResult=await db.from('gyn_pregnancies').select('*').eq('clinic_id',clinic.id).eq('status','ongoing').order('created_at',{ascending:false});if(pregnancyResult.error)throw pregnancyResult.error;const ancResult=await db.from('gyn_anc_visits').select('*').eq('clinic_id',clinic.id).order('visit_date',{ascending:false}).limit(300);if(ancResult.error)throw ancResult.error;const scanResult=await db.from('gyn_ultrasounds').select('*').eq('clinic_id',clinic.id).order('scan_date',{ascending:false}).limit(300);if(scanResult.error)throw scanResult.error;let invData=[],rxData=[],reviewData=[];if(['owner','doctor','nurse'].includes(role)){const ir=await db.from('gyn_investigations').select('*').eq('clinic_id',clinic.id).order('result_date',{ascending:false}).limit(300);if(ir.error)throw ir.error;invData=ir.data||[]}if(['owner','doctor'].includes(role)){const rr=await db.from('gyn_prescriptions').select('*').eq('clinic_id',clinic.id).order('prescribed_at',{ascending:false}).limit(200);if(rr.error)throw rr.error;rxData=rr.data||[];const hr=await db.from('gyn_high_risk_reviews').select('*').eq('clinic_id',clinic.id).order('review_date',{ascending:false}).limit(200);if(hr.error)throw hr.error;reviewData=hr.data||[]}patients=patientResult.data||[];appointments=appointmentResult.data||[];pregnancies=pregnancyResult.data||[];ancVisits=ancResult.data||[];ultrasounds=scanResult.data||[];investigations=invData;prescriptions=rxData;highRiskReviews=reviewData;render()}
+async function fetchClinicRows(table,orderColumn,extraFilter){
+ const rows=[],pageSize=500;
+ for(let offset=0;;offset+=pageSize){
+  let query=db.from(table).select('*').eq('clinic_id',clinic.id);
+  if(extraFilter)query=query.eq(extraFilter.column,extraFilter.value);
+  const {data,error}=await query.order(orderColumn,{ascending:false}).order('id',{ascending:true}).range(offset,offset+pageSize-1);
+  if(error)throw error;
+  rows.push(...(data||[]));
+  if(!data||data.length<pageSize)break;
+ }
+ return rows;
+}
+async function loadAll(){
+ const patientResult=await db.from('gyn_patients').select('*').eq('clinic_id',clinic.id).is('archived_at',null).order('created_at',{ascending:false});
+ if(patientResult.error)throw patientResult.error;
+ const [appointmentRows,pregnancyRows,ancRows,scanRows]=await Promise.all([
+  fetchClinicRows('gyn_appointments','appointment_at'),
+  fetchClinicRows('gyn_pregnancies','created_at'),
+  fetchClinicRows('gyn_anc_visits','visit_date'),
+  fetchClinicRows('gyn_ultrasounds','scan_date')
+ ]);
+ let invData=[],rxData=[],reviewData=[];
+ if(['owner','doctor','nurse'].includes(role))invData=await fetchClinicRows('gyn_investigations','result_date');
+ if(['owner','doctor'].includes(role)){
+  [rxData,reviewData]=await Promise.all([
+   fetchClinicRows('gyn_prescriptions','prescribed_at'),
+   fetchClinicRows('gyn_high_risk_reviews','review_date')
+  ]);
+ }
+ patients=patientResult.data||[];
+ appointments=appointmentRows;
+ pregnancyHistoryRecords=pregnancyRows;
+ pregnancies=pregnancyHistoryRecords.filter(x=>String(x.status||'').toLowerCase()==='ongoing');
+ ancVisits=ancRows;
+ ultrasounds=scanRows;
+ investigations=invData;
+ prescriptions=rxData;
+ highRiskReviews=reviewData;
+ render();
+}
 function renderMaternalOverview(){
  const cards=$('maternalOverviewCards'),select=$('maternalTimelinePatient'),timeline=$('maternalTimeline');
  if(!cards||!select||!timeline)return;
@@ -275,9 +314,9 @@ function renderMaternalOverview(){
  const patientId=select.value;
  if(!patientId){timeline.innerHTML='<div class="empty">Select a patient to view the clinical timeline.</div>';return}
  const p=byId.get(patientId);
- const pg=pregnancies.filter(g=>g.patient_id===patientId);
+ const pg=(pregnancyHistoryRecords||pregnancies).filter(g=>g.patient_id===patientId);
  const events=[];
- pg.forEach(g=>events.push({date:g.created_at||g.lmp_date,title:'Pregnancy record',detail:'LMP '+(g.lmp_date||'—')+' · EDD '+(g.edd_date||'—')+' · GA '+ageWeeks(g.lmp_date)+' · recorded risk level '+(g.risk_level||'not assessed')}));
+ pg.forEach(g=>events.push({date:g.created_at||g.lmp_date,title:'Pregnancy record · '+(g.status||'status not recorded'),detail:'LMP '+(g.lmp_date||'—')+' · EDD '+(g.edd_date||'—')+' · GA '+ageWeeks(g.lmp_date)+' · recorded risk level '+(g.risk_level||'not assessed')}));
  ancVisits.filter(x=>x.patient_id===patientId).forEach(x=>events.push({date:x.visit_date,title:'ANC visit',detail:'BP '+(x.bp_systolic&&x.bp_diastolic?x.bp_systolic+'/'+x.bp_diastolic:'—')+' · pulse '+(x.pulse_bpm??'—')+' · weight '+(x.weight_kg??'—')+' kg · '+(x.assessment||x.plan||x.symptoms||'No narrative recorded')}));
  ultrasounds.filter(x=>x.patient_id===patientId).forEach(x=>events.push({date:x.scan_date,title:'Ultrasound',detail:[x.scan_type,x.impression,typeof x.findings==='string'?x.findings:JSON.stringify(x.findings||{})].filter(Boolean).join(' · ')}));
  investigations.filter(x=>x.patient_id===patientId).forEach(x=>events.push({date:x.result_date,title:'Investigation',detail:[x.investigation_type,x.result_summary,JSON.stringify(x.result_data||{})].filter(Boolean).join(' · ')}));
@@ -1512,7 +1551,7 @@ function analyticsRecords(){
  return {
   patients:patients||[],
   appointments:filter(appointments,'appointment_at'),
-  pregnancies:(pregnancies||[]),
+  pregnancies:(pregnancyHistoryRecords||pregnancies||[]).filter(x=>!start||analyticsInPeriod(x.lmp_date||x.created_at,start)),
   anc:filter(ancVisits,'visit_date'),
   scans:filter(ultrasounds,'scan_date'),
   investigations:filter(investigations,'result_date'),
@@ -1533,7 +1572,7 @@ function renderPatientAnalytics(){
  const d=analyticsRecords(),patientSelect=$('analyticsPatient'),previous=patientSelect.value;
  patientSelect.innerHTML='<option value="">Select a patient</option>'+d.patients.map(p=>'<option value="'+analyticsEscape(p.id)+'">'+analyticsEscape((p.patient_code||'')+' · '+(p.full_name||''))+'</option>').join('');
  if(previous&&d.patients.some(p=>p.id===previous))patientSelect.value=previous;
- const kpis=[['Registered patients',d.patients.length],['Appointments in period',d.appointments.length],['Ongoing pregnancies',d.pregnancies.filter(x=>x.status==='ongoing').length],['ANC visits',d.anc.length],['Ultrasound records',d.scans.length],['Investigations',d.investigations.length],['Prescriptions',d.prescriptions.length],['Uploaded patient documents',(moduleData.gyn_attachments||[]).length],['OCR candidate values',comparativeClinicalOcrItems.flatMap(extractClinicalCandidateValues).length],['Recorded deliveries',d.deliveries.length]];
+ const kpis=[['Registered patients',d.patients.length],['Appointments in period',d.appointments.length],['Ongoing pregnancies',d.pregnancies.filter(x=>x.status==='ongoing').length],['Pregnancy history records',d.pregnancies.length],['Completed pregnancies',d.pregnancies.filter(x=>String(x.status||'').toLowerCase()!=='ongoing').length],['ANC visits',d.anc.length],['Ultrasound records',d.scans.length],['Investigations',d.investigations.length],['Prescriptions',d.prescriptions.length],['Uploaded patient documents',(moduleData.gyn_attachments||[]).length],['OCR candidate values',comparativeClinicalOcrItems.flatMap(extractClinicalCandidateValues).length],['Recorded deliveries',d.deliveries.length]];
  $('analyticsKpis').innerHTML=kpis.map(x=>'<div class="card"><div class="muted small">'+analyticsEscape(x[0])+'</div><div class="stat">'+x[1]+'</div></div>').join('');
  const ageGroups=[['Under 20',0],['20–29',0],['30–39',0],['40–49',0],['50+',0],['DOB not recorded',0]];
  d.patients.forEach(p=>{const a=analyticsAge(p);if(a===null)ageGroups[5][1]++;else if(a<20)ageGroups[0][1]++;else if(a<30)ageGroups[1][1]++;else if(a<40)ageGroups[2][1]++;else if(a<50)ageGroups[3][1]++;else ageGroups[4][1]++});
@@ -1543,7 +1582,7 @@ function renderPatientAnalytics(){
  $('analyticsCategories').innerHTML=cats.map(x=>analyticsBar(x[0],x[1],total)).join('');
  const months={};
  const addMonth=(rows,key)=>rows.forEach(x=>{if(!x[key])return;const dt=new Date(x[key]);if(Number.isNaN(dt.getTime()))return;const m=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');months[m]=(months[m]||0)+1});
- addMonth(d.appointments,'appointment_at');addMonth(d.anc,'visit_date');addMonth(d.scans,'scan_date');addMonth(d.investigations,'result_date');addMonth(d.prescriptions,'prescribed_at');
+ addMonth(d.appointments,'appointment_at');addMonth(d.pregnancies,'lmp_date');addMonth(d.anc,'visit_date');addMonth(d.scans,'scan_date');addMonth(d.investigations,'result_date');addMonth(d.prescriptions,'prescribed_at');addMonth(d.deliveries,'delivery_datetime');
  const monthKeys=Object.keys(months).sort().slice(-12),max=Math.max(1,...monthKeys.map(k=>months[k]));
  $('analyticsMonthly').innerHTML=monthKeys.length?monthKeys.map(k=>'<div style="display:grid;grid-template-columns:85px 1fr 35px;gap:8px;align-items:center;margin:7px 0"><span class="small">'+k+'</span><div style="height:12px;background:#e8efec;border-radius:20px;overflow:hidden"><div style="height:12px;width:'+(months[k]/max*100).toFixed(1)+'%;background:#176b5b"></div></div><strong>'+months[k]+'</strong></div>').join(''):'<div class="empty">No dated activity in the selected period.</div>';
  $('analyticsStatus').textContent='Analysis refreshed from the signed-in clinic’s existing records · '+new Date().toLocaleString();
@@ -1617,11 +1656,11 @@ $('analyticsPatientDetail').addEventListener('click',async e=>{
 
 $('analyticsPatient').addEventListener('change',renderSelectedPatientAnalytics);
 $('analyticsPeriod').addEventListener('change',renderPatientAnalytics);
-$('refreshPatientAnalytics').addEventListener('click',async()=>{const b=$('refreshPatientAnalytics');b.disabled=true;$('analyticsStatus').textContent='Refreshing clinic records…';try{await loadAll();renderPatientAnalytics()}catch(e){$('analyticsStatus').textContent='Could not refresh: '+(e.message||String(e))}finally{b.disabled=false}});
+$('refreshPatientAnalytics').addEventListener('click',async()=>{const b=$('refreshPatientAnalytics');b.disabled=true;$('analyticsStatus').textContent='Refreshing clinic records…';try{await loadAll();await loadModuleLists();renderPatientAnalytics()}catch(e){$('analyticsStatus').textContent='Could not refresh: '+(e.message||String(e))}finally{b.disabled=false}});
 $('printAnalyticsPatient').addEventListener('click',()=>{if(!$('analyticsPatient').value)return;window.print()});
 $('exportAnalyticsCsv').addEventListener('click',()=>{
- const d=analyticsRecords(),rows=[['Patient ID','Patient name','Age','Blood group','Pregnancy records','ANC visits','Ultrasounds','Investigations','Prescriptions','Appointments']];
- d.patients.forEach(p=>{const id=p.id;rows.push([p.patient_code||'',p.full_name||'',analyticsAge(p)??'',p.blood_group||'',d.pregnancies.filter(x=>x.patient_id===id).length,d.anc.filter(x=>x.patient_id===id).length,d.scans.filter(x=>x.patient_id===id).length,d.investigations.filter(x=>x.patient_id===id).length,d.prescriptions.filter(x=>x.patient_id===id).length,d.appointments.filter(x=>x.patient_id===id).length])});
+ const d=analyticsRecords(),rows=[['Patient ID','Patient name','Age','Blood group','Pregnancy history records','Ongoing pregnancies','Completed pregnancies','ANC visits','Ultrasounds','Investigations','Prescriptions','Appointments','Deliveries']];
+ d.patients.forEach(p=>{const id=p.id;rows.push([p.patient_code||'',p.full_name||'',analyticsAge(p)??'',p.blood_group||'',d.pregnancies.filter(x=>x.patient_id===id).length,d.pregnancies.filter(x=>x.patient_id===id&&String(x.status||'').toLowerCase()==='ongoing').length,d.pregnancies.filter(x=>x.patient_id===id&&String(x.status||'').toLowerCase()!=='ongoing').length,d.anc.filter(x=>x.patient_id===id).length,d.scans.filter(x=>x.patient_id===id).length,d.investigations.filter(x=>x.patient_id===id).length,d.prescriptions.filter(x=>x.patient_id===id).length,d.appointments.filter(x=>x.patient_id===id).length,d.deliveries.filter(x=>x.patient_id===id).length])});
  const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='clinic_patient_analysis.csv';a.click();URL.revokeObjectURL(url);
  alert('Confidential patient analysis exported. Store the file securely.');
