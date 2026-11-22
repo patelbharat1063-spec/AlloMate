@@ -18,9 +18,9 @@ The Edge Function source is committed for review only. It has **not** been deplo
 In Supabase Dashboard for project `elrmnfxmcznszxowgvth`:
 
 1. Authentication → OAuth Server → enable OAuth 2.1.
-2. Set the authorization path to `/oauth/consent`.
+2. Set the authorization path to `/oauth/consent/`. The consent page is committed at `gynaecology/oauth/consent/index.html` and is intended to load the existing Supabase browser session from the same origin.
 3. Enable Dynamic Client Registration only if needed by the ChatGPT connector flow. Review registered clients and revoke grants when access is no longer needed.
-4. Authentication → URL Configuration: set Site URL to the clinic consent page origin. The current GitHub Pages app is under `https://patelbharat1063-spec.github.io/AlloMate/gynaecology/`; the consent route must be hosted there and preserve the `authorization_id` query parameter.
+4. Authentication → URL Configuration: set Site URL to `https://patelbharat1063-spec.github.io/AlloMate/gynaecology` (no trailing slash). The consent route is `https://patelbharat1063-spec.github.io/AlloMate/gynaecology/oauth/consent/` and must preserve the `authorization_id` query parameter.
 5. Confirm the project uses an asymmetric JWT signing key (ES256 or RS256). Supabase's `withSupabase({ auth: "user" })` middleware rejects legacy HS256 tokens.
 6. Build and test the consent UI. It must use the signed-in clinic session and Supabase JS OAuth methods:
    - `supabase.auth.oauth.getAuthorizationDetails(authorization_id)`
