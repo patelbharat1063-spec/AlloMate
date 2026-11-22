@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#123d39"><title>Secure Clinical Document Export</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{--ink:#173b37;--muted:#667b77;--bg:#f3f7f5;--line:#dce8e3;--teal:#176b5b;--mint:#e5f3ed;--rose:#fff0ef}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:#1c302d;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -32,7 +33,7 @@ small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;ba
 <div class="panel"><div class="row" style="justify-content:space-between"><h2>Choose patient</h2><button id="signOut" class="secondary">Sign out</button></div>
 <label for="clinicSelect">Clinic workspace</label><select id="clinicSelect"><option value="">Loading clinics…</option></select>
 <label for="patientSelect">Patient</label><select id="patientSelect" disabled><option value="">Choose a clinic first</option></select>
-<div class="row" style="margin-top:14px"><button id="retrieve" disabled>Retrieve original clinical documents</button></div>
+<div class="row" style="margin-top:14px"><button id="retrieve" disabled>Retrieve selected patient</button><button id="retrieveAll" class="secondary" disabled>Export ALL patients as ZIP</button></div><p><small>All-patient export runs sequentially to limit memory use. It includes clinical images/PDFs only and excludes identity documents.</small></p>
 <div id="status" aria-live="polite"></div></div>
 <div id="results" class="panel hidden"><h2>Available original files</h2><p id="expiryNote"></p><div id="fileList"></div></div>
 </section>
@@ -46,6 +47,7 @@ small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;ba
  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
  const $ = id => document.getElementById(id);
  let clinics = [];
+ let patients = [];
  const say = (id, message, error=false) => { const el=$(id); el.className=error?'msg err':'msg'; el.textContent=message; };
  async function loadClinics(){
    const {data,error}=await db.from('gyn_memberships').select('clinic_id,role').eq('is_active',true);
@@ -61,7 +63,7 @@ small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;ba
    const {data,error}=await db.from('gyn_patients').select('id,patient_code,full_name').eq('clinic_id',clinicId).order('full_name');
    if(error) throw error;
    $('patientSelect').innerHTML='<option value="">Select patient</option>'+(data||[]).map(p=>'<option value="'+p.id+'">'+String(p.patient_code||'')+' · '+String(p.full_name||'')+'</option>').join('');
-   $('patientSelect').disabled=false;$('retrieve').disabled=false;
+   $('patientSelect').disabled=false;$('retrieve').disabled=false;$('retrieveAll').disabled=patients.length===0;
  }
  $('signIn').addEventListener('click',async()=>{
    $('signIn').disabled=true;
@@ -86,6 +88,48 @@ small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;ba
      say('status','Retrieved '+ok.length+' original clinical file link(s). Identity documents were excluded.');
    }catch(e){say('status',e.message||String(e),true)}finally{$('retrieve').disabled=false}
  });
+
+ $('retrieveAll').addEventListener('click',async()=>{
+   if(!patients.length||!$('clinicSelect').value){say('status','No patients are available for this clinic.',true);return}
+   if(!window.JSZip){say('status','ZIP library did not load. Refresh and try again.',true);return}
+   const clinicId=$('clinicSelect').value,zip=new JSZip(),manifest={created_at:new Date().toISOString(),clinic_id:clinicId,patients_total:patients.length,patients:[],privacy:"Identity documents excluded; clinical originals only."};
+   $('retrieveAll').disabled=true;$('retrieve').disabled=true;
+   let filesAdded=0,failed=0;
+   try{
+     for(let i=0;i<patients.length;i++){
+       const p=patients[i],folder=zip.folder((String(p.patient_code||'patient')+'_'+String(p.full_name||'').replace(/[^a-z0-9_-]+/gi,'_')).slice(0,90));
+       say('status','Exporting patient '+(i+1)+' of '+patients.length+': '+(p.full_name||p.patient_code||p.id));
+       const entry={patient_id:p.id,patient_code:p.patient_code||'',patient_name:p.full_name||'',files:[],errors:[]};
+       try{
+         const {data,error}=await db.functions.invoke('gyn-secure-document-export',{body:{clinic_id:clinicId,patient_id:p.id}});
+         if(error)throw error;if(data?.error)throw new Error(data.error);
+         for(const d of (data.documents||[])){
+           if(!d.url){entry.errors.push({filename:d.filename||'',error:d.error||'No signed URL'});failed++;continue}
+           try{
+             const response=await fetch(d.url);
+             if(!response.ok)throw new Error('HTTP '+response.status);
+             const blob=await response.blob();
+             const safeName=String(d.filename||('attachment_'+d.id)).replace(/[\\/:*?"<>|]/g,'_');
+             folder.file(safeName,blob);
+             entry.files.push({filename:safeName,mime_type:d.mime_type||'',size_bytes:blob.size,created_at:d.created_at||null});
+             filesAdded++;
+           }catch(e){entry.errors.push({filename:d.filename||'',error:String(e.message||e)});failed++}
+         }
+       }catch(e){entry.errors.push({error:String(e.message||e)});failed++}
+       manifest.patients.push(entry);
+     }
+     zip.file('EXPORT_MANIFEST.json',JSON.stringify(manifest,null,2));
+     if(!filesAdded){say('status','No original files could be downloaded. Check the manifest/export permissions and try a single patient.',true);return}
+     say('status','Preparing ZIP: '+filesAdded+' original file(s), '+failed+' retrieval issue(s).');
+     const blob=await zip.generateAsync({type:'blob',compression:'STORE'},meta=>{if(meta.percent%20<1)say('status','Building ZIP… '+Math.round(meta.percent)+'%')});
+     const a=document.createElement('a'),url=URL.createObjectURL(blob);
+     a.href=url;a.download='Clinic_Clinical_Originals_'+new Date().toISOString().slice(0,10)+'.zip';
+     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+     say('status','Export complete: '+filesAdded+' original file(s) across '+patients.length+' patients. '+failed+' issue(s) are listed in EXPORT_MANIFEST.json. Review the manifest before relying on completeness.');
+   }catch(e){say('status','ZIP export failed: '+(e.message||String(e)),true)}
+   finally{$('retrieveAll').disabled=patients.length===0;$('retrieve').disabled=!$('patientSelect').value}
+ });
+
  $('signOut').addEventListener('click',async()=>{await db.auth.signOut();location.reload()});
  function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
  function escapeAttr(v){return escapeHtml(v)}
