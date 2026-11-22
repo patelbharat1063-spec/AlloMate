@@ -62,6 +62,7 @@ small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;ba
    if(!clinicId){$('patientSelect').innerHTML='<option value="">Select clinic first</option>';return}
    const {data,error}=await db.from('gyn_patients').select('id,patient_code,full_name').eq('clinic_id',clinicId).order('full_name');
    if(error) throw error;
+   patients=data||[];
    $('patientSelect').innerHTML='<option value="">Select patient</option>'+(data||[]).map(p=>'<option value="'+p.id+'">'+String(p.patient_code||'')+' · '+String(p.full_name||'')+'</option>').join('');
    $('patientSelect').disabled=false;$('retrieve').disabled=false;$('retrieveAll').disabled=patients.length===0;
  }
