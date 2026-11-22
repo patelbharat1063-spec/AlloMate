@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#123d39"><title>Secure Clinical Document Export</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--ink:#173b37;--muted:#667b77;--bg:#f3f7f5;--line:#dce8e3;--teal:#176b5b;--mint:#e5f3ed;--rose:#fff0ef}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#1c302d;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:linear-gradient(120deg,#123d39,#1b7564);color:white;padding:20px max(18px,calc((100% - 900px)/2))}
+main{max-width:900px;margin:22px auto;padding:0 16px}.panel{background:white;border:1px solid var(--line);border-radius:15px;padding:18px;margin:14px 0;box-shadow:0 10px 30px #163b3210}
+h1{font-size:21px;margin:0}h2{font-size:18px;margin:0 0 10px}p{margin:7px 0;color:var(--muted)}
+label{display:block;font-size:13px;font-weight:650;margin:12px 0 5px;color:#4c625d}
+input,select{width:100%;border:1px solid #cfddd7;border-radius:9px;padding:11px;background:white;font:inherit}
+button,.btn{border:0;background:var(--teal);color:white;padding:11px 15px;border-radius:9px;font:inherit;font-weight:650;cursor:pointer;display:inline-block;text-decoration:none}
+button.secondary{background:var(--mint);color:var(--ink)}button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hidden{display:none!important}.msg{padding:10px 12px;background:var(--mint);border-radius:9px;margin:12px 0}.err{background:var(--rose);color:#9b302b}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+small{color:var(--muted)}.warn{border-left:4px solid #c48a32;padding:9px 12px;background:#fff7e9;color:#704b13;border-radius:7px}
+@media(max-width:600px){.panel{padding:14px}td,th{font-size:12px}}
+</style></head>
+<body>
+<header><h1>Secure Clinical Document Export</h1><div style="opacity:.82;font-size:13px">Patient-scoped access · Original files · No database edits</div></header>
+<main>
+<section id="loginPanel" class="panel">
+<h2>Clinic sign in</h2><p>Use your existing clinic account. This page does not create accounts or change patient records.</p>
+<label for="email">Email</label><input id="email" type="email" autocomplete="username">
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password">
+<div class="row" style="margin-top:14px"><button id="signIn">Sign in</button></div><div id="loginStatus" aria-live="polite"></div>
+</section>
+<section id="workspace" class="hidden">
+<div class="panel"><div class="row" style="justify-content:space-between"><h2>Choose patient</h2><button id="signOut" class="secondary">Sign out</button></div>
+<label for="clinicSelect">Clinic workspace</label><select id="clinicSelect"><option value="">Loading clinics…</option></select>
+<label for="patientSelect">Patient</label><select id="patientSelect" disabled><option value="">Choose a clinic first</option></select>
+<div class="row" style="margin-top:14px"><button id="retrieve" disabled>Retrieve original clinical documents</button></div>
+<div id="status" aria-live="polite"></div></div>
+<div id="results" class="panel hidden"><h2>Available original files</h2><p id="expiryNote"></p><div id="fileList"></div></div>
+</section>
+<section class="panel"><div class="warn"><strong>Privacy and safety:</strong> Only active clinic members with owner, doctor or nurse role can retrieve files. Aadhaar and other identity documents are excluded. Temporary links expire after five minutes. Do not forward links or download files to shared devices. This tool does not send documents to an AI service.</div>
+<p><small>For ChatGPT analysis, retrieve only the selected patient's clinical originals and provide them through a supported ChatGPT file-access workflow. This page does not make ChatGPT automatically connected to private storage.</small></p></section>
+</main>
+<script>
+(() => {
+ const SUPABASE_URL = "https://elrmnfxmcznszxowgvth.supabase.co";
+ const SUPABASE_KEY = "sb_publishable_xIMARwNLH_7NAnfiCI3qfw_BlBDfTx0";
+ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+ const $ = id => document.getElementById(id);
+ let clinics = [];
+ const say = (id, message, error=false) => { const el=$(id); el.className=error?'msg err':'msg'; el.textContent=message; };
+ async function loadClinics(){
+   const {data,error}=await db.from('gyn_memberships').select('clinic_id,role').eq('is_active',true);
+   if(error) throw error;
+   clinics=(data||[]).filter(x=>['owner','doctor','nurse'].includes(x.role));
+   $('clinicSelect').innerHTML='<option value="">Select clinic</option>'+clinics.map(x=>'<option value="'+x.clinic_id+'">'+x.clinic_id+' · '+x.role+'</option>').join('');
+   if(clinics.length===1){$('clinicSelect').value=clinics[0].clinic_id;await loadPatients();}
+ }
+ async function loadPatients(){
+   const clinicId=$('clinicSelect').value;
+   $('patientSelect').disabled=true;$('patientSelect').innerHTML='<option>Loading patients…</option>';
+   if(!clinicId){$('patientSelect').innerHTML='<option value="">Select clinic first</option>';return}
+   const {data,error}=await db.from('gyn_patients').select('id,patient_code,full_name').eq('clinic_id',clinicId).order('full_name');
+   if(error) throw error;
+   $('patientSelect').innerHTML='<option value="">Select patient</option>'+(data||[]).map(p=>'<option value="'+p.id+'">'+String(p.patient_code||'')+' · '+String(p.full_name||'')+'</option>').join('');
+   $('patientSelect').disabled=false;$('retrieve').disabled=false;
+ }
+ $('signIn').addEventListener('click',async()=>{
+   $('signIn').disabled=true;
+   try{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)throw error;
+     $('loginPanel').classList.add('hidden');$('workspace').classList.remove('hidden');await loadClinics();
+     if(!clinics.length) say('status','No active owner/doctor/nurse clinic membership was found.',true);
+   }catch(e){say('loginStatus',e.message||String(e),true)}finally{$('signIn').disabled=false}
+ });
+ $('clinicSelect').addEventListener('change',()=>loadPatients().catch(e=>say('status',e.message||String(e),true)));
+ $('retrieve').addEventListener('click',async()=>{
+   const clinicId=$('clinicSelect').value,patientId=$('patientSelect').value;
+   if(!clinicId||!patientId){say('status','Select both clinic and patient.',true);return}
+   $('retrieve').disabled=true;$('results').classList.add('hidden');say('status','Verifying clinic access and preparing short-lived links…');
+   try{
+     const {data,error}=await db.functions.invoke('gyn-secure-document-export',{body:{clinic_id:clinicId,patient_id:patientId}});
+     if(error)throw error;if(data?.error)throw new Error(data.error);
+     const docs=data.documents||[],ok=docs.filter(d=>d.url),failed=docs.filter(d=>!d.url);
+     $('expiryNote').textContent='Patient: '+(data.patient?.full_name||'')+' · Temporary links expire in '+data.expires_in_seconds+' seconds. Download promptly.';
+     $('fileList').innerHTML=ok.length?'<table><thead><tr><th>Original file</th><th>Type / size</th><th>Action</th></tr></thead><tbody>'+ok.map(d=>'<tr><td>'+escapeHtml(d.filename||'Clinical attachment')+'<br><small>'+escapeHtml(d.created_at?new Date(d.created_at).toLocaleString():'')+'</small></td><td>'+escapeHtml(d.mime_type||'')+'<br><small>'+Math.round((Number(d.size_bytes)||0)/1024)+' KB</small></td><td><a class="btn" target="_blank" rel="noopener noreferrer" href="'+escapeAttr(d.url)+'">Open original</a></td></tr>').join('')+'</tbody></table>':'<p>No supported clinical originals were found for this patient.</p>';
+     if(failed.length)$('fileList').insertAdjacentHTML('beforeend','<div class="msg err">'+failed.length+' file(s) could not be opened due to storage permissions or missing objects. No permission was broadened.</div>');
+     $('results').classList.remove('hidden');
+     say('status','Retrieved '+ok.length+' original clinical file link(s). Identity documents were excluded.');
+   }catch(e){say('status',e.message||String(e),true)}finally{$('retrieve').disabled=false}
+ });
+ $('signOut').addEventListener('click',async()=>{await db.auth.signOut();location.reload()});
+ function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+ function escapeAttr(v){return escapeHtml(v)}
+ db.auth.getSession().then(async({data})=>{if(data.session){$('loginPanel').classList.add('hidden');$('workspace').classList.remove('hidden');try{await loadClinics()}catch(e){say('status',e.message||String(e),true)}}});
+})();
+</script></body></html>
